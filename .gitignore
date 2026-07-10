@@ -1,0 +1,5 @@
+cache_ancien/
+.ipynb_checkpoints/
+__pycache__/
+cache/
+UntitledCroma.ipynb

@@ -1,0 +1,94 @@
+
+Avec la méthode "nearest" : 
+══════════════════════════════════════════
+        Résultats — Test set
+══════════════════════════════════════════
+  Overall Accuracy (OA)  : 0.6880 (68.80%)
+  Average Accuracy (AA)  : 0.5304 (53.04%)
+  Macro F1               : 0.5400
+══════════════════════════════════════════
+
+Accuracy par classe :
+  LCZ  1 : 0.2707 (27.07%)
+  LCZ  2 : 0.5372 (53.72%)
+  LCZ  3 : 0.7456 (74.56%)
+  LCZ  4 : 0.7748 (77.48%)
+  LCZ  5 : 0.2556 (25.56%)
+  LCZ  6 : 0.5341 (53.41%)
+  LCZ  7 : 0.0934 (9.34%)
+  LCZ  8 : 0.9085 (90.85%)
+  LCZ  9 : 0.5286 (52.86%)
+  LCZ 10 : 0.3899 (38.99%)
+  LCZ 11 : 0.8412 (84.12%)
+  LCZ 12 : 0.2402 (24.02%)
+  LCZ 13 : 0.2530 (25.30%)
+  LCZ 14 : 0.9080 (90.80%)
+  LCZ 15 : 0.0732 (7.32%)
+  LCZ 16 : 0.6713 (67.13%)
+  LCZ 17 : 0.9913 (99.13%)
+  
+  
+  Avec la méthode "bilinear" : 
+══════════════════════════════════════════
+        Résultats — Test set
+══════════════════════════════════════════
+  Overall Accuracy (OA)  : 0.6755 (67.55%)
+  Average Accuracy (AA)  : 0.5231 (52.31%)
+  Macro F1               : 0.5301
+══════════════════════════════════════════
+
+Accuracy par classe :
+  LCZ  1 : 0.3534 (35.34%)
+  LCZ  2 : 0.5571 (55.71%)
+  LCZ  3 : 0.7047 (70.47%)
+  LCZ  4 : 0.7538 (75.38%)
+  LCZ  5 : 0.4037 (40.37%)
+  LCZ  6 : 0.5522 (55.22%)
+  LCZ  7 : 0.0318 (3.18%)
+  LCZ  8 : 0.9105 (91.05%)
+  LCZ  9 : 0.4600 (46.00%)
+  LCZ 10 : 0.3293 (32.93%)
+  LCZ 11 : 0.8463 (84.63%)
+  LCZ 12 : 0.3072 (30.72%)
+  LCZ 13 : 0.2161 (21.61%)
+  LCZ 14 : 0.9039 (90.39%)
+  LCZ 15 : 0.1073 (10.73%)
+  LCZ 16 : 0.4825 (48.25%)
+  LCZ 17 : 0.9724 (97.24%)
+
+
+Résultats du test pour 32 pixels en non linear probing
+
+══════════════════════════════════════════
+        Résultats — Test set
+══════════════════════════════════════════
+  Overall Accuracy (OA)  : 0.5808 (58.08%)
+  Average Accuracy (AA)  : 0.4353 (43.53%)
+  Macro F1               : 0.4300
+══════════════════════════════════════════
+
+Accuracy par classe :
+  LCZ  1 : 0.1617 (16.17%)
+  LCZ  2 : 0.4889 (48.89%)
+  LCZ  3 : 0.4669 (46.69%)
+  LCZ  4 : 0.5858 (58.58%)
+  LCZ  5 : 0.3277 (32.77%)
+  LCZ  6 : 0.5511 (55.11%)
+  LCZ  7 : 0.0199 (1.99%)
+  LCZ  8 : 0.8332 (83.32%)
+  LCZ  9 : 0.3080 (30.80%)
+  LCZ 10 : 0.1839 (18.39%)
+  LCZ 11 : 0.8459 (84.59%)
+  LCZ 12 : 0.3857 (38.57%)
+  LCZ 13 : 0.1012 (10.12%)
+  LCZ 14 : 0.7109 (71.09%)
+  LCZ 15 : 0.0780 (7.80%)
+  LCZ 16 : 0.3864 (38.64%)
+  LCZ 17 : 0.9654 (96.54%)
+
+  Conclusion : 
+Comme le non linear probing et le linear probing sont assez proches,
+cela signifie que les encodings ont des relations linéaires entre elles 
+ils sont le résultat d'un préentraînement qui a été bien réalisé et 
+sont adaptées avec la tâche de classification(à hauteur des résultats que l'on 
+obtient pour chacune de nos métriques...)
