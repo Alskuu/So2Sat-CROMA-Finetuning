@@ -28,35 +28,22 @@ exactly instead of guessing.
 """
 
 import os
-import sys
 import math
-import time
 import signal
 import logging
-import argparse
-from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
 import multiprocessing
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.checkpoint import checkpoint as grad_checkpoint
 from torch.optim import AdamW
-from torch.cuda.amp import GradScaler
 
 
 from use_croma import PretrainedCROMA
-from dataset import So2SatDataset
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s",
-                    handlers=[
-                        # Sauvegarde dans les fichiers
-                        logging.FileHandler("training_croma.log"),
-                        logging.StreamHandler()  # Affiche aussi dans le terminal
-                    ])
+# Configuration du logger (détaillée ci-dessous)
 logger = logging.getLogger(__name__)
 
 # c'est l'encoding que l'on utilise avec ce modèle
@@ -73,13 +60,10 @@ class FineTuneConfig:
     backbone_checkpoint: str
     backbone_size: str = "base"
     image_resolution: int = 120
-    # dir containing best_linear_probe_{mtd}_{res}.pt
-    probe_checkpoint_dir: str = ""
     # "nearest" | "bilinear"
     interpolation_mtd: str = "nearest"
-    modality: str = "both"
-    # explicit override; bypasses probe_checkpoint_dir/interpolation_mtd
-    head_init_path: Optional[str] = f"{checkpoint_dir}/best_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt"
+    # explicit override; bypasses checkpoint_dir/interpolation_mtd
+    head_init_path: Optional[str] = None
     epochs: int = 30
     batch_size: int = 32
     backbone_lr: float = 1e-5
@@ -277,7 +261,6 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
     # The dictionnary key becomes : (tower_name, has_decay)
     # bucket backbone params by inferred depth
     depth_buckets = {}
-    max_depth = 0
     for name, p in model.backbone.named_parameters():
         if not p.requires_grad:
             continue
@@ -288,7 +271,7 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
             depth = int(parts[idx_pos]) if idx_pos < len(
                 parts) and parts[idx_pos].isdigit() else 0
 
-        # norm_out : LR max (équivalent depth = max_depth + 1, decay=0)
+        # norm_out : LR max
         elif "norm_out" in parts:
             depth = None  # traité à part, cf. ci-dessous
         else:
@@ -435,7 +418,7 @@ def setup_hardware_and_distributed():
         logger.info(f"Périphérique cible principal : {device}")
         logger.info("=" * 60 + "\n")
 
-    return is_distributed, device, local_rank, rank
+    return is_distributed, device, local_rank, rank, world_size
 
 # --------------------------------------------------------------------------- #
 # Graceful SLURM preemption handling
@@ -451,19 +434,29 @@ def setup_hardware_and_distributed():
 
 class PreemptionFlag:
     def __init__(self):
-        self.should_stop = False
+        self.should_stop = torch.tensor(
+            0, dtype=torch.int32, device="cuda" if torch.cuda.is_available() else "cpu")
+
         # SIGTERM is the polite asking of closing given
         signal.signal(signal.SIGTERM, self._handle)
 
     def _handle(self, signum, frame):
         logger.warning(
             "Received SIGTERM - will checkpoint and exit after this step.")
-        self.should_stop = True
+        self.should_stop.fill_(1)
 
+    def synchronize(self, is_distributed: bool):
+        if is_distributed:
+            # Broadcast the signal from any rank that caught it (usually Slurm signals all ranks, but better safe than sorry)
+            torch.distributed.all_reduce(
+                self.should_stop, op=torch.distributed.ReduceOp.MAX)
+        return self.should_stop.item() == 1
 
 # --------------------------------------------------------------------------- #
 # Checkpointing
 # --------------------------------------------------------------------------- #
+
+
 def save_checkpoint(path, model, optimizer, scaler, epoch, global_step, best_metric, epochs_without_improvement=0):
     state_dict = model.module.state_dict() if hasattr(
         model, "module") else model.state_dict()
@@ -505,7 +498,7 @@ def prepare_batch(batch, device: bool):
     return sar, optical, labels
 
 
-def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank):
+def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed):
     model.train()
     running_loss = 0.0
     loss_fn = nn.CrossEntropyLoss()
@@ -519,6 +512,10 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
 
     for i, batch in enumerate(loader):
         sar, optical, labels = prepare_batch(batch, device)
+
+        # Periodically check preemption
+        if i % 10 == 0 and killer.synchronize(is_distributed):
+            break
 
         with torch.amp.autocast(device_type="cuda", dtype=cfg.mixed_precision):
             logits = model(sar, optical)
@@ -562,175 +559,67 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
             logger.info(
                 f"step {global_step} | loss  pour le rank 0 {running_loss / (i + 1):.4f}")
 
-        if killer.should_stop:
-            break
-
     return global_step, running_loss / max(1, len(loader))
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, cfg):
+def evaluate(model, loader, device, world_size, num_val_samples, is_distributed):
     model.eval()
-    all_preds, all_labels = [], []
-    for batch in loader:
-        sar, optical, labels = prepare_batch(batch, device)
-        with torch.amp.autocast(device_type="cuda", dtype=cfg.mixed_precision):
-            logits = model(sar, optical)
-        preds = logits.argmax(dim=1)
-        all_preds.append(preds.cpu())
-        all_labels.append(labels.cpu())
-    all_preds = torch.cat(all_preds)
-    all_labels = torch.cat(all_labels)
-    oa, aa = compute_oa_aa(all_preds, all_labels)
-    return oa, aa
+    all_preds = []
+    all_targets = []
 
+    with torch.no_grad():
+        for sar, optical, labels in loader:
+            sar, optical = sar.to(device), optical.to(device)
+            outputs = model(sar, optical)
+            preds = torch.argmax(outputs, dim=1)
 
-# --------------------------------------------------------------------------- #
-# Main
-# --------------------------------------------------------------------------- #
-def build_argparser():
-    p = argparse.ArgumentParser()
-    # Chemin vers les données So2Sat
-    p.add_argument("--data-dir", type=str, required=True)
-    # Dossier où le script va sauvegarder ses checkpoints
-    p.add_argument("--checkpoint-dir", type=str, required=True)
-    # Chemin vers le fichier des poids préentraînés de notre modèle
-    p.add_argument("--backbone-checkpoint", type=str, required=True)
-    p.add_argument("--backbone-size", type=str, default="base")
-    p.add_argument("--image-resolution", type=int, default=120)
-    p.add_argument("--interpolation-mtd", type=str, default="nearest",
-                   choices=["bilinear", "nearest"])
-    p.add_argument("--probe-checkpoint-dir", type=str, default="checkpoints")
-    p.add_argument("--patience", type=int, default=5)
-    p.add_argument("--early-stop-epsilon", type=float, default=0.001)
-    p.add_argument("--min-epochs", type=int, default=8)
-    p.add_argument("--epochs", type=int, default=30)
-    p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--backbone-lr", type=float, default=1e-5)
-    p.add_argument("--head-lr", type=float, default=1e-3)
-    p.add_argument("--layer-decay", type=float, default=0.75)
-    p.add_argument("--weight-decay", type=float, default=0.05)
-    p.add_argument("--warmup-steps", type=int, default=2000)
-    p.add_argument("--freeze-n-layers", type=int, default=0)
-    DTYPE_MAP = {"bfloat16": torch.bfloat16,
-                 "float16": torch.float16, "float32": torch.float32}
-    p.add_argument("--mixed-precision",
-                   type=lambda s: DTYPE_MAP[s], default=torch.bfloat16, choices=DTYPE_MAP.values())
-    p.add_argument("--no-gradient-checkpointing",
-                   action="store_false", dest="gradient_checkpointing")
-    p.add_argument("--num-workers", type=int, default=8)
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--no-resume", action="store_false", dest="resume")
-    return p
+            all_preds.append(preds)
+            all_targets.append(labels.to(device))
 
-
-def main():
-    args = build_argparser().parse_args()
-    cfg = FineTuneConfig(**vars(args))
-
-    torch.manual_seed(cfg.seed)
-    Path(cfg.checkpoint_dir).mkdir(parents=True, exist_ok=True)
-
-    is_distributed, device, local_rank, rank = setup_hardware_and_distributed()
-
-    backbone = load_croma_backbone(
-        cfg.backbone_checkpoint, size=cfg.backbone_size)
-    backbone = backbone.to(device)
-
-    model = CROMAFineTuning(
-        backbone=backbone,
-        num_classes=NUM_CLASSES,
-        embed_dim=EMBED_DIM,
-        freeze_n_layers=cfg.freeze_n_layers,
-        use_gradient_checkpointing=cfg.gradient_checkpointing,
-    ).to(device)
-
-    model.load_pretrained_head(str(cfg.head_init_path))
-
-    # CRITICAL: Build optimizer BEFORE wrapping with DDP.
-    # Layer-Wise Rate Decay (LLRD) needs direct access to model.backbone and model.head.
-    # Once wrapped in DDP, these attributes move under 'model.module' and would throw an AttributeError.
-    optimizer = build_optimizer(model, cfg)
+    preds_local = torch.cat(all_preds)
+    targets_local = torch.cat(all_targets)
 
     if is_distributed:
-        model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank])
-
-    train_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution)
-    val_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/validation.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution)
-
-    train_sampler = DistributedSampler(train_ds) if is_distributed else None
-    train_loader = DataLoader(
-        train_ds, batch_size=cfg.batch_size, shuffle=(train_sampler is None),
-        sampler=train_sampler, num_workers=cfg.num_workers, pin_memory=True,
-        persistent_workers=cfg.num_workers > 0,
-    )
-    val_loader = DataLoader(
-        val_ds, batch_size=cfg.batch_size, shuffle=False,
-        num_workers=cfg.num_workers, pin_memory=True,
-        persistent_workers=cfg.num_workers > 0,
-    )
-
-    scaler = torch.amp.GradScaler(
-        enabled=(cfg.mixed_precision == torch.float16))
-    killer = PreemptionFlag()
-
-    start_epoch, global_step, best_metric, epochs_without_improvement = 0, 0, 0.0, 0
-    last_ckpt = Path(cfg.checkpoint_dir) / "last.pt"
-    if cfg.resume and last_ckpt.exists():
-        start_epoch, global_step, best_metric, epochs_without_improvement = load_checkpoint(
-            last_ckpt, model, optimizer, scaler)
-
-    total_steps = cfg.epochs * len(train_loader)
-
-    for epoch in range(start_epoch, cfg.epochs):
-        if is_distributed:
-            train_sampler.set_epoch(epoch)
-
-        global_step, train_loss = train_one_epoch(
-            model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank
+        # We gather all predictions and labels across GPUs to calculate the exact validation score
+        full_preds = torch.empty(
+            preds_local.numel() * world_size,
+            dtype=preds_local.dtype,
+            device=device
         )
-        if rank == 0:
-            logger.info(f"Epoch {epoch} | train_loss {train_loss:.4f}")
+        full_targets = torch.empty(
+            targets_local.numel() * world_size,
+            dtype=targets_local.dtype,
+            device=device
+        )
 
-        if (epoch + 1) % cfg.eval_every == 0:
-            oa, aa = evaluate(model, val_loader, device, cfg)
-            logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
-            if aa > best_metric + cfg.early_stop_epsilon:
-                best_metric = aa
-                epochs_without_improvement = 0
-                if rank == 0:
-                    save_checkpoint(Path(cfg.checkpoint_dir) / "best.pt",
-                                    model, optimizer, scaler, epoch, global_step, best_metric, epochs_without_improvement)
-            else:
-                epochs_without_improvement += 1
-                if rank == 0:
-                    logger.info(
-                        f"Pas d'amélioration <= {cfg.early_stop_epsilon} de l'AA \n ({epochs_without_improvement}/{cfg.patience} étapes sans améliorations)"
-                    )
-        if rank == 0:
-            save_checkpoint(last_ckpt, model, optimizer, scaler,
-                            epoch, global_step, best_metric, epochs_without_improvement)
+        # DIRECT COLLECTIVE COMMUNICATION GPU-TO-GPU (NCCL)
+        # Very fast exchange between tensors, without going through the CPU neither with "pickle"
+        torch.distributed.all_gather_into_tensor(full_preds, preds_local)
+        torch.distributed.all_gather_into_tensor(full_targets, targets_local)
+    else:
+        full_preds = preds_local
+        full_targets = targets_local
 
-        if killer.should_stop:
-            if rank == 0:
-                logger.info(
-                    "Exiting cleanly after SIGTERM (job should requeue with --requeue).")
-            sys.exit(0)
+    # Thanks to the SequentialDistributedSampler, all the padding is at the end of full_preds.
+    # We truncate to the exact size for rigorous and duplicate-free metric computation.
+    full_preds = full_preds[:num_val_samples]
+    full_targets = full_targets[:num_val_samples]
 
-        if epoch + 1 >= cfg.min_epochs and epochs_without_improvement >= cfg.patience:
-            if rank == 0:
-                logger.info(
-                    f"Arrêt anticipé : AA sans amélioration depuis {epochs_without_improvement} epochs"
-                )
-                logger.info(
-                    f"évaluations (patience={cfg.patience}, min_epochs={cfg.min_epochs}).")
-            break
-        if is_distributed:
-            torch.distributed.barrier()   # tout le monde attend que rank 0 ait fini d'écrire
+    # Calculate the Global Exactitude (OA - Overall Accuracy)
+    correct = (full_preds == full_targets).float().sum().item()
+    oa = correct / num_val_samples
 
+    # Calculate the Mean Exactitude (AA - Average Accuracy)
+    # We recover all the unique classes that are in the validation dataset
+    unique_classes = torch.unique(full_targets)
+    class_accuracies = []
+    for c in unique_classes:
+        class_mask = (full_targets == c)
+        if class_mask.sum() > 0:
+            class_acc = (full_preds[class_mask] == c).float().mean().item()
+            class_accuracies.append(class_acc)
 
-if __name__ == "__main__":
-    main()
+    aa = sum(class_accuracies) / \
+        len(class_accuracies) if class_accuracies else 0.0
+    return oa, aa
