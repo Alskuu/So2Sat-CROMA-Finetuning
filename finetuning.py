@@ -39,6 +39,7 @@ import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint as grad_checkpoint
 from torch.optim import AdamW
+from torch.amp import autocast
 
 
 from use_croma import PretrainedCROMA
@@ -75,7 +76,7 @@ class FineTuneConfig:
     freeze_n_layers: int = 0
     mixed_precision: torch.dtype = torch.bfloat16
     gradient_checkpointing: bool = True
-    num_workers: int = 8
+    num_workers: int = 6
     seed: int = 42
     # contrôle si le scipt doit reprendre l'entraînement là où il
     # s'était arrêté en rechargeant un checkpoint existant
@@ -84,9 +85,9 @@ class FineTuneConfig:
     log_every: int = 50
 
     # Early stopping (on the validation AA)
-    patience: int = 5
+    patience: int = 8
     early_stop_epsilon: float = 0.001
-    min_epochs: int = 8
+    min_epochs: int = 18
 
 
 # -------------------Modèle------------------------------------------------
@@ -517,7 +518,7 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
         if i % 10 == 0 and killer.synchronize(is_distributed):
             break
 
-        with torch.amp.autocast(device_type="cuda", dtype=cfg.mixed_precision):
+        with autocast(device_type="cuda", dtype=cfg.mixed_precision):
             logits = model(sar, optical)
             loss = loss_fn(logits, labels)
 

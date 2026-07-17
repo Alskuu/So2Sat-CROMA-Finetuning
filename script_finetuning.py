@@ -3,6 +3,7 @@ import sys
 import torch
 from pathlib import Path
 import logging
+from torch.amp import GradScaler
 
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -123,7 +124,7 @@ def main():
 
     train_sampler = DistributedSampler(train_ds) if is_distributed else None
     val_sampler = SequentialDistributedSampler(
-        val_ds, world_size, shuffle=False) if is_distributed else None
+        val_ds, world_size, rank) if is_distributed else None
     # Dans la commande Slurm ajouter une commande pour allouer suffisamment de ces ressources
     train_loader = DataLoader(
         train_ds, batch_size=cfg.batch_size, shuffle=(train_sampler is None),
@@ -137,7 +138,7 @@ def main():
         persistent_workers=cfg.num_workers > 0,
     )
 
-    scaler = torch.cuda.amp.GradScaler(
+    scaler = GradScaler(
         enabled=(cfg.mixed_precision == torch.float16))
     killer = PreemptionFlag()
 
