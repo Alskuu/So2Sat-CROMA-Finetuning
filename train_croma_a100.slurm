@@ -2,10 +2,9 @@
 #SBATCH --job-name=croma_ft
 #SBATCH --output=logs/croma_ft_%j.out
 #SBATCH --error=logs/croma_ft_%j.out
-#SBATCH --account=ubn26na@a100
+#SBATCH --account=ubn26na@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
 #SBATCH --qos=qos_gpu-dev                 # QoS max 2h sur du V100
 #SBATCH --nodes=1                        # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
-#SBATCH --ntasks-per-node=4              # 4 GPU/noeud -> monte à 8 pour un noeud A100 complet
 #SBATCH --cpus-per-task=8                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
 #SBATCH -C v100-32g                      # demander l'accès à des GPUs V100 ainsi que 32 Go de RAM
 #SBATCH --gres=gpu:1
@@ -24,9 +23,9 @@ module load pytorch-gpu/py3/2.4.0        # <-- vérifie la version dispo avec `m
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 export MASTER_PORT=29500
 
-export DATA_DIR=$WORK/so2sat_lcz42                       # <-- adapte
-export CKPT_DIR=$WORK/croma_checkpoints/run_001           # <-- adapte (change à chaque nouveau run si tu ne veux pas resume)
-export BACKBONE_CKPT=$WORK/croma_pretrained/CROMA_base.pt # <-- adapte
+export DATA_DIR=$SCRATCH/data/LCZ42/                       
+export CKPT_DIR=$WORK/So2Sat-CROMA-Finetuning/checkpoints/           # <-- adapte (change à chaque nouveau run si tu ne veux pas resume)
+export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt # <-- adapte
 
 mkdir -p "$CKPT_DIR" logs
 
@@ -38,7 +37,7 @@ srun bash -c '
         --data-dir "$DATA_DIR" \
         --checkpoint-dir "$CKPT_DIR" \
         --backbone-checkpoint "$BACKBONE_CKPT" \
-        --epochs 30 \
+        --epochs 1 \
         --batch-size 32 \
         --num-workers 6
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
