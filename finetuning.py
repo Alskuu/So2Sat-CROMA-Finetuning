@@ -79,7 +79,7 @@ class FineTuneConfig:
     freeze_n_layers: int = 0
     mixed_precision: torch.dtype = torch.float16
     gradient_checkpointing: bool = True
-    num_workers: int = 8
+    num_workers: int = 4
     seed: int = 42
     # contrôle si le scipt doit reprendre l'entraînement là où il
     # s'était arrêté en rechargeant un checkpoint existant

@@ -4,10 +4,11 @@
 #SBATCH --error=logs/croma_ft_%j.out
 #SBATCH --qos=qos_gpu-dev                 # QoS max 2h sur du V100
 #SBATCH --partition=gpu_p2                # Cas des 32 Go de VRAM
-#SBATCH --nodes=1                        # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
-#SBATCH --cpus-per-task=10                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
+#SBATCH --nodes=1                       # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=6                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
 #SBATCH --account=rsn@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 #SBATCH --hint=nomultithread
 #SBATCH --time=02:00:00                  # max autorisé sur la partition qos_gpu-dev
 #SBATCH --signal=B:SIGTERM@120           # 120s de préavis avant kill -> laisse le temps de checkpointer proprement
@@ -29,13 +30,16 @@ export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True # Gestion dynamique de la VRAM sous Linux pour éviter les OOM dus à des blocs non contigus
 
 srun bash -c '
+    export RANK=$SLURM_PROCID
+    export LOCAL_RANK=$SLURM_LOCALID
+    export WORLD_SIZE=$SLURM_NTASKS 
     python -u script_finetuning.py \
         --data-dir "$DATA_DIR" \
         --checkpoint-dir "$CKPT_DIR" \
         --backbone-checkpoint "$BACKBONE_CKPT" \
         --epochs 1 \
-        --batch-size 128 \
-        --num-workers 8
+        --batch-size 64 \
+        --num-workers 4
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
     # (ex: après un --requeue suite à une préemption), le run reprendra automatiquement.
 '
