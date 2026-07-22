@@ -3,6 +3,7 @@
 #SBATCH --output=logs/croma_ft_%j.out
 #SBATCH --error=logs/croma_ft_%j.out
 #SBATCH --qos=qos_gpu-dev                 # QoS max 2h sur du V100
+#SBATCH --partition=gpu_p2                # Cas des 32 Go de VRAM
 #SBATCH --nodes=1                        # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
 #SBATCH --cpus-per-task=10                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
 #SBATCH --account=rsn@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
