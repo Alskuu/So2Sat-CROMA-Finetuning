@@ -66,19 +66,20 @@ class FineTuneConfig:
     # explicit override; bypasses checkpoint_dir/interpolation_mtd
     head_init_path: Optional[str] = None
     epochs: int = 25
-    batch_size: int = 32
-    backbone_lr: float = 1e-4
+    batch_size: int = 128
+    backbone_lr: float = 2e-4
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
-    head_lr: float = 1e-4
+    head_lr: float = 2e-4
     # LLRD factor, <1 => earlier layers get smaller LR : mostly 0.65 for ViT-Base and 0.75 for ViT-Large
     layer_decay: float = 0.65
     weight_decay: float = 0.05
-    warmup_steps: int = 20000
+    # It is recommended to have warump_steps equal to 1/10th of the steps awaited in our training
+    warmup_steps: int = 6800
     # 0 = full fine-tuning; >0 for partial fine-tuning ablation
     freeze_n_layers: int = 0
     mixed_precision: torch.dtype = torch.float16
     gradient_checkpointing: bool = True
-    num_workers: int = 6
+    num_workers: int = 8
     seed: int = 42
     # contrôle si le scipt doit reprendre l'entraînement là où il
     # s'était arrêté en rechargeant un checkpoint existant
@@ -163,7 +164,7 @@ class CROMAFineTuning(nn.Module):
         init. Preserves pretrained backbone features much better than naive
         full fine-tuning (Kumar et al., ICLR 2022).
         """
-        state = torch.load(path, map_location="cpu")
+        state = torch.load(path, map_location="cpu", weights_only=True)
         missing = {"weight", "bias"} - state.keys()
         if missing:
             raise KeyError(
@@ -477,7 +478,7 @@ def save_checkpoint(path, model, optimizer, scaler, epoch, global_step, best_met
 
 
 def load_checkpoint(path, model, optimizer, scaler):
-    ckpt = torch.load(path, map_location="cpu")
+    ckpt = torch.load(path, map_location="cpu", weights_only=True)
     target = model.module if hasattr(model, "module") else model
     target.load_state_dict(ckpt["model"])
     optimizer.load_state_dict(ckpt["optimizer"])

@@ -54,21 +54,21 @@ def build_argparser():
     p.add_argument("--image-resolution", type=int, default=120)
     p.add_argument("--interpolation-mtd", type=str, default="nearest",
                    choices=["bilinear", "nearest"])
-    p.add_argument("--patience", type=int, default=5)
+    p.add_argument("--patience", type=int, default=8)
     p.add_argument("--early-stop-epsilon", type=float, default=0.001)
-    p.add_argument("--min-epochs", type=int, default=8)
-    p.add_argument("--epochs", type=int, default=30)
-    p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--backbone-lr", type=float, default=1e-5)
-    p.add_argument("--head-lr", type=float, default=1e-3)
-    p.add_argument("--layer-decay", type=float, default=0.75)
+    p.add_argument("--min-epochs", type=int, default=15)
+    p.add_argument("--epochs", type=int, default=25)
+    p.add_argument("--batch-size", type=int, default=128)
+    p.add_argument("--backbone-lr", type=float, default=2e-4)
+    p.add_argument("--head-lr", type=float, default=2e-4)
+    p.add_argument("--layer-decay", type=float, default=0.65)
     p.add_argument("--weight-decay", type=float, default=0.05)
-    p.add_argument("--warmup-steps", type=int, default=2000)
+    p.add_argument("--warmup-steps", type=int, default=6800)
     p.add_argument("--freeze-n-layers", type=int, default=0)
     DTYPE_MAP = {"bfloat16": torch.bfloat16,
                  "float16": torch.float16, "float32": torch.float32}
     p.add_argument("--mixed-precision",
-                   type=lambda s: DTYPE_MAP[s], default=torch.bfloat16, choices=DTYPE_MAP.values())
+                   type=lambda s: DTYPE_MAP[s], default=torch.float16, choices=DTYPE_MAP.values())
     p.add_argument("--no-gradient-checkpointing",
                    action="store_false", dest="gradient_checkpointing")
     p.add_argument("--num-workers", type=int, default=8)
