@@ -16,16 +16,14 @@ set -euo pipefail   # c'est une commande de sécurité en bash, si une commande 
 
 module purge                           # efface toutes les bibliothèquese logicielles chargées par défaut pour démarrer sur une base propre
 conda deactivate 2>/dev/null || true   # désactive conda et si on ne trouve déjà pas conda, no pb on continue, il n'y a pas de pipefail
-module load pytorch-gpu/py3/2.4.0        # <-- vérifie la version dispo avec `module avail pytorch-gpu`
+module load pytorch-gpu/py3/2.4.0        
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 export MASTER_PORT=29500
 
 export DATA_DIR=$SCRATCH/data/LCZ42/                       
-export CKPT_DIR=$WORK/So2Sat-CROMA-Finetuning/checkpoints/           # <-- adapte (change à chaque nouveau run si tu ne veux pas resume)
-export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt # <-- adapte
-
-mkdir -p "$CKPT_DIR" logs
+export CKPT_DIR=$WORK/So2Sat-CROMA-Finetuning/checkpoints/          
+export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt 
 
 srun bash -c '
     python -u script_finetuning.py \
@@ -33,7 +31,7 @@ srun bash -c '
         --checkpoint-dir "$CKPT_DIR" \
         --backbone-checkpoint "$BACKBONE_CKPT" \
         --epochs 1 \
-        --batch-size 32 \
+        --batch-size 128 \
         --num-workers 8
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
     # (ex: après un --requeue suite à une préemption), le run reprendra automatiquement.

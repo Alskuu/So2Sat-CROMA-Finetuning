@@ -30,8 +30,6 @@ from sampler import SequentialDistributedSampler
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(message)s",
                     handlers=[
-                        # Sauvegarde dans les fichiers
-                        logging.FileHandler("training_croma.log"),
                         logging.StreamHandler()  # Affiche aussi dans le terminal
                     ])
 logger = logging.getLogger(__name__)
