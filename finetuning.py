@@ -65,16 +65,18 @@ class FineTuneConfig:
     interpolation_mtd: str = "nearest"
     # explicit override; bypasses checkpoint_dir/interpolation_mtd
     head_init_path: Optional[str] = None
-    epochs: int = 30
+    epochs: int = 25
     batch_size: int = 32
-    backbone_lr: float = 1e-5
-    head_lr: float = 1e-3
-    layer_decay: float = 0.75          # LLRD factor, <1 => earlier layers get smaller LR
+    backbone_lr: float = 1e-4
+    # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
+    head_lr: float = 1e-4
+    # LLRD factor, <1 => earlier layers get smaller LR : mostly 0.65 for ViT-Base and 0.75 for ViT-Large
+    layer_decay: float = 0.65
     weight_decay: float = 0.05
-    warmup_steps: int = 2000
+    warmup_steps: int = 20000
     # 0 = full fine-tuning; >0 for partial fine-tuning ablation
     freeze_n_layers: int = 0
-    mixed_precision: torch.dtype = torch.bfloat16
+    mixed_precision: torch.dtype = torch.float16
     gradient_checkpointing: bool = True
     num_workers: int = 6
     seed: int = 42
@@ -87,7 +89,7 @@ class FineTuneConfig:
     # Early stopping (on the validation AA)
     patience: int = 8
     early_stop_epsilon: float = 0.001
-    min_epochs: int = 18
+    min_epochs: int = 15
 
 
 # -------------------Modèle------------------------------------------------
