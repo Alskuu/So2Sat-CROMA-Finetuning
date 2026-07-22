@@ -25,6 +25,8 @@ export DATA_DIR=$SCRATCH/data/LCZ42/
 export CKPT_DIR=$WORK/So2Sat-CROMA-Finetuning/checkpoints/          
 export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt 
 
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True # Gestion dynamique de la VRAM sous Linux pour éviter les OOM dus à des blocs non contigus
+
 srun bash -c '
     python -u script_finetuning.py \
         --data-dir "$DATA_DIR" \
