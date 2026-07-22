@@ -11,7 +11,6 @@
 #SBATCH --hint=nomultithread
 #SBATCH --time=02:00:00                  # max autorisé sur la partition qos_gpu-dev
 #SBATCH --signal=B:SIGTERM@120           # 120s de préavis avant kill -> laisse le temps de checkpointer proprement
-#SBATCH --account=ubn26na@v100
 #SBATCH --requeue                        # combiné au signal ci-dessus : le job est automatiquement resoumis après préemption
 
 set -euo pipefail   # c'est une commande de sécurité en bash, si une commande échoue ou qu'une variable est mal définie : arrêt immédiat
