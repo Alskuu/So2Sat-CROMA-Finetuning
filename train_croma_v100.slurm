@@ -6,7 +6,6 @@
 #SBATCH --qos=qos_gpu-dev                 # QoS max 2h sur du V100
 #SBATCH --nodes=1                        # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
 #SBATCH --cpus-per-task=8                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
-#SBATCH -C v100-32g                      # demander l'accès à des GPUs V100 ainsi que 32 Go de RAM
 #SBATCH --gres=gpu:1
 #SBATCH --hint=nomultithread
 #SBATCH --time=02:00:00                  # max autorisé sur la partition qos_gpu-dev
