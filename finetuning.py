@@ -495,9 +495,11 @@ def prepare_batch(batch, device: bool):
     # non_blocking=True asks PyTorch to do the transfer CPU to GPU asynchronycally
     # without waiting to get all the the copy of the batch charged on the CPU
     # It helps to gain a little bit of time
-    sar = batch["s1"].to(device, non_blocking=True)
-    optical = batch["s2"].to(device, non_blocking=True)
-    labels = batch["label"].to(device, non_blocking=True)
+    sar, optical, labels = batch
+
+    sar = sar.to(device, non_blocking=True)
+    optical = optical.to(device, non_blocking=True)
+    labels = labels.to(device, non_blocking=True)
     return sar, optical, labels
 
 

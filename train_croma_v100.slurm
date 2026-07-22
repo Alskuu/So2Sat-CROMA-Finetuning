@@ -28,9 +28,6 @@ export BACKBONE_CKPT=$WORK/CROMA_weights/CROMA_base.pt # <-- adapte
 mkdir -p "$CKPT_DIR" logs
 
 srun bash -c '
-    export RANK=$SLURM_PROCID
-    export LOCAL_RANK=$SLURM_LOCALID
-    export WORLD_SIZE=$SLURM_NTASKS
     python -u script_finetuning.py \
         --data-dir "$DATA_DIR" \
         --checkpoint-dir "$CKPT_DIR" \
