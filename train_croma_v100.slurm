@@ -2,7 +2,7 @@
 #SBATCH --job-name=croma_ft
 #SBATCH --output=logs/croma_ft_%j.out
 #SBATCH --error=logs/croma_ft_%j.out
-#SBATCH --qos=qos_gpu-dev                 # QoS max 2h sur du V100
+#SBATCH --qos=qos_gpu-t3                 # QoS max 2h sur du V100
 #SBATCH --partition=gpu_p2                # Cas des 32 Go de VRAM
 #SBATCH --nodes=1                       # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
 #SBATCH --ntasks-per-node=2
@@ -10,7 +10,7 @@
 #SBATCH --account=rsn@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
 #SBATCH --gres=gpu:2
 #SBATCH --hint=nomultithread
-#SBATCH --time=02:00:00                  # max autorisé sur la partition qos_gpu-dev
+#SBATCH --time=20:00:00                  # max autorisé sur la partition qos_gpu-dev
 #SBATCH --signal=B:SIGTERM@120           # 120s de préavis avant kill -> laisse le temps de checkpointer proprement
 #SBATCH --requeue                        # combiné au signal ci-dessus : le job est automatiquement resoumis après préemption
 

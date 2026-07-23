@@ -344,7 +344,7 @@ def cosine_warmup_lr_lambda(step: int, warmup_steps: int, total_steps: int):
 
 
 # --------------------------------------------------------------------------- #
-# Metrics: OA / AA, as decided during your probing phase
+# Metrics: OA / AA, as decided during the probing phase
 # --------------------------------------------------------------------------- #
 def compute_oa_aa(preds: torch.Tensor, labels: torch.Tensor, num_classes: int = NUM_CLASSES):
     correct = (preds == labels).sum().item()

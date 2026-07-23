@@ -6,3 +6,4 @@ UntitledCroma.ipynb
 checkpoints/best_linear_probe_optical_bilinear_120.pt
 checkpoints/best_linear_probe_optical_nearest_120.pt
 lr_range_test_inutile/
+testing_model.py
