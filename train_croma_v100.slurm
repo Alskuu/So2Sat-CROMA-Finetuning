@@ -37,7 +37,6 @@ srun bash -c '
         --data-dir "$DATA_DIR" \
         --checkpoint-dir "$CKPT_DIR" \
         --backbone-checkpoint "$BACKBONE_CKPT" \
-        --epochs 1 \
         --batch-size 64 \
         --num-workers 4
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà

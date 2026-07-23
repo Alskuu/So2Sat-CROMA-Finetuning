@@ -55,7 +55,7 @@ def build_argparser():
     p.add_argument("--patience", type=int, default=8)
     p.add_argument("--early-stop-epsilon", type=float, default=0.001)
     p.add_argument("--min-epochs", type=int, default=15)
-    p.add_argument("--epochs", type=int, default=25)
+    p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch-size", type=int, default=128)
     p.add_argument("--backbone-lr", type=float, default=2e-4)
     p.add_argument("--head-lr", type=float, default=2e-4)

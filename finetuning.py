@@ -65,7 +65,7 @@ class FineTuneConfig:
     interpolation_mtd: str = "nearest"
     # explicit override; bypasses checkpoint_dir/interpolation_mtd
     head_init_path: Optional[str] = None
-    epochs: int = 25
+    epochs: int = 30
     batch_size: int = 128
     backbone_lr: float = 2e-4
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
