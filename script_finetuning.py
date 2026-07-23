@@ -161,8 +161,8 @@ def main():
         is_preempted = killer.synchronize(is_distributed)
 
         if (epoch + 1) % cfg.eval_every == 0 and not is_preempted:
-            oa, aa = evaluate(model, val_loader, device, world_size, is_distributed,
-                              num_val_samples=len(val_ds))
+            oa, aa = evaluate(model, val_loader, device,
+                              world_size, is_distributed)
 
             logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
             if aa > best_metric + cfg.early_stop_epsilon:
