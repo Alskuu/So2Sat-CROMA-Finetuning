@@ -148,7 +148,7 @@ def main():
 
     total_steps = cfg.epochs * len(train_loader)
 
-    for epoch in range(start_epoch, cfg.epochs):
+    for epoch in range(start_epoch+1, cfg.epochs):
         if is_distributed:
             train_sampler.set_epoch(epoch)
 
@@ -160,7 +160,7 @@ def main():
             # Synchronize signal status across all ranks
         is_preempted = killer.synchronize(is_distributed)
 
-        if (epoch + 1) % cfg.eval_every == 0 and not is_preempted:
+        if epoch % cfg.eval_every == 0 and not is_preempted:
             oa, aa = evaluate(model, val_loader, device,
                               world_size, len(val_ds), is_distributed)
 
