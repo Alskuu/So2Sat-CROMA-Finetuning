@@ -162,7 +162,7 @@ def main():
 
         if (epoch + 1) % cfg.eval_every == 0 and not is_preempted:
             oa, aa = evaluate(model, val_loader, device,
-                              world_size, is_distributed)
+                              world_size, len(val_ds), is_distributed)
 
             logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
             if aa > best_metric + cfg.early_stop_epsilon:
