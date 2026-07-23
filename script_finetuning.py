@@ -113,7 +113,7 @@ def main():
 
     if is_distributed:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank])
+            model, device_ids=[local_rank], find_unused_parameters=True)
 
     train_ds = So2SatDataset(
         h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution)
