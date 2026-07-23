@@ -194,7 +194,7 @@ def main():
                 except Exception as e:
                     logger.warning(
                         f"Erreur lors de la fermeture des datasets : {e}")
-            sys.exit(0)
+            sys.exit(1)
 
         if epoch + 1 >= cfg.min_epochs and epochs_without_improvement >= cfg.patience:
             if rank == 0:

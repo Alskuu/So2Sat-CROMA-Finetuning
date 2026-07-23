@@ -435,6 +435,8 @@ def setup_hardware_and_distributed():
 # for example...
 # --------------------------------------------------------------------------- #
 
+# Very useful combined to #SBATCH --requeue in my SLURM script so I don't need to wait 20 hours to get 20 free hours, and I can play with the 2 hours of gpu-dev continuously
+
 
 class PreemptionFlag:
     def __init__(self):
