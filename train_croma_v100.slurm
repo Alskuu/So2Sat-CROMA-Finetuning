@@ -10,12 +10,12 @@
 #SBATCH --account=rsn@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
 #SBATCH --gres=gpu:2
 #SBATCH --hint=nomultithread
-#SBATCH --time=01:30:00                  # max autorisé sur la partition qos_gpu-dev
-#SBATCH --signal=B:SIGTERM@180           # 120s de préavis avant kill -> laisse le temps de checkpointer proprement
-#SBATCH --requeue                        # combiné au signal ci-dessus : le job est automatiquement resoumis après préemption
+#SBATCH --time=01:30:00                  # Comme on sait qu'un epoch dure 40 minutes environ, on sait qu'à partir de 1h30, l'epoch sera interrompu au milieu
+#SBATCH --signal=SIGTERM@240           # 240s de préavis avant kill -> laisse le temps de checkpointer proprement
+#SBATCH --requeue                      # combiné au signal ci-dessus : le job est automatiquement resoumis après préemption
+#SBATCH --open-mode=append             # pour ne pas écraser le log à la reprise (car le requeue se fait sur le même job ID)
 
-set -euo pipefail   # c'est une commande de sécurité en bash, si une commande échoue ou qu'une variable est mal définie : arrêt immédiat
-
+set -uo pipefail   # <-- on retire le -e global, on gère l'exit code de srun nous-mêmes
 module purge                           # efface toutes les bibliothèquese logicielles chargées par défaut pour démarrer sur une base propre
 conda deactivate 2>/dev/null || true   # désactive conda et si on ne trouve déjà pas conda, no pb on continue, il n'y a pas de pipefail
 module load pytorch-gpu/py3/2.4.0        
@@ -42,3 +42,21 @@ srun bash -c '
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
     # (ex: après un --requeue suite à une préemption), le run reprendra automatiquement.
 '
+EXIT_CODE=$?
+echo "srun terminé avec le code : $EXIT_CODE"
+
+case $EXIT_CODE in
+    0)
+        echo "Entraînement terminé normalement."
+        ;;
+    99)
+        # code réservé côté python pour "préempté proprement, merci de reprendre"
+        # le scontrol permet de forcer Slurm dans ce cas précis à effectuer un requeue..
+        echo "Préemption détectée (code 99) -> requeue explicite du job."
+        scontrol requeue "$SLURM_JOB_ID"
+        ;;
+    *)
+        echo "Erreur réelle (code $EXIT_CODE) -> pas de requeue automatique."
+        exit $EXIT_CODE
+        ;;
+esac
