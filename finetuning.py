@@ -67,7 +67,7 @@ class FineTuneConfig:
     head_init_path: Optional[str] = None
     epochs: int = 30
     batch_size: int = 128
-    backbone_lr: float = 2e-4
+    backbone_lr: float = 2e-5
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
     head_lr: float = 2e-4
     # LLRD factor, <1 => earlier layers get smaller LR : mostly 0.65 for ViT-Base and 0.75 for ViT-Large
@@ -85,7 +85,7 @@ class FineTuneConfig:
     # s'était arrêté en rechargeant un checkpoint existant
     resume: bool = True
     eval_every: int = 1
-    log_every: int = 50
+    log_every: int = 300
 
     # Early stopping (on the validation AA)
     patience: int = 8
@@ -564,8 +564,16 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
         running_loss += loss.item()
 
         if (i + 1) % cfg.log_every == 0 and rank == 0:
+
+            # Récupération du LR maximum parmi tous les groupes de paramètres (ex: head)
+            max_lr = max(g["lr"] for g in optimizer.param_groups)
+
+            # Récupération de la valeur du scale si FP16 activé
+            scale_val = scaler.get_scale() if is_fp16 else 1.0
+            scale_str = f" | scale {scale_val:.0f}" if is_fp16 else ""
+
             logger.info(
-                f"step {global_step} | loss  pour le rank 0 {running_loss / (i + 1):.4f}")
+                f"step {global_step} | loss  pour le rank 0 {running_loss / (i + 1):.4f} | max_lr {max_lr:.2e}{scale_str}")
 
     return global_step, running_loss / max(1, len(loader))
 
