@@ -194,7 +194,8 @@ def main():
                 except Exception as e:
                     logger.warning(
                         f"Erreur lors de la fermeture des datasets : {e}")
-            sys.exit(1)
+            # L'erreur 99 permet de créer une erreur spécifique compréhensible par mon script slurm pour obliger le --requeue..
+            sys.exit(99)
 
         if epoch + 1 >= cfg.min_epochs and epochs_without_improvement >= cfg.patience:
             if rank == 0:
