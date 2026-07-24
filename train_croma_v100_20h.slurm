@@ -41,4 +41,3 @@ srun bash -c '
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
     # (ex: après un --requeue suite à une préemption), le run reprendra automatiquement.
 '
-
