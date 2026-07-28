@@ -1,5 +1,5 @@
 import torch
-from torch import nn  # provides classes and functions for building neural networks
+from torch import nn
 from use_croma import PretrainedCROMA
 from dataset import TARGET_SIZE
 

@@ -235,10 +235,12 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
 
     if head_decay:
         param_groups.append(
-            {"params": head_decay, "lr": cfg.head_lr, "weight_decay": cfg.weight_decay})
+            {"params": head_decay, "lr": cfg.head_lr, "weight_decay": cfg.weight_decay,
+             "group_type": "head"})
     if head_no_decay:
         param_groups.append(
-            {"params": head_no_decay, "lr": cfg.head_lr, "weight_decay": 0.0}
+            {"params": head_no_decay, "lr": cfg.head_lr,
+                "weight_decay": 0.0, "group_type": "head"}
         )
 
     # Sectorisation by tours and calculation from the max_depth per tour
@@ -283,11 +285,8 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
 
         # Security decay : Determinate if the parameter need a weight decay
         # We verify its dimension (p.ndim <= 1) and key words in its name by safety
-        if p.ndim <= 1 or "bias" in parts or "norm" in parts:
-            has_decay = False
-        else:
-            has_decay = True
-
+        has_decay = False if (
+            p.ndim <= 1 or "bias" in parts or "norm" in parts) else True
         bucket_key = (tower_name, depth, has_decay)
         depth_buckets.setdefault(bucket_key, []).append(p)
 
@@ -307,6 +306,7 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
                 "params": norm_out_params,
                 "lr": cfg.backbone_lr,
                 "weight_decay": 0.0,
+                "group_type": "backbone"
             })
     # 4 : Final groups creation with the LLRD calculation per block
     for (tower_name, depth, has_decay), params in depth_buckets.items():
@@ -319,6 +319,7 @@ def build_llrd_param_groups(model: CROMAFineTuning, cfg: FineTuneConfig):
             "params": params,
             "lr": lr,
             "weight_decay": weight_decay_value,
+            "group_type": "backbone"
         })
 
     return param_groups
@@ -566,14 +567,17 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
         if (i + 1) % cfg.log_every == 0 and rank == 0:
 
             # Récupération du LR maximum parmi tous les groupes de paramètres (ex: head)
-            max_lr = max(g["lr"] for g in optimizer.param_groups)
+            max_lr_head = max((g["lr"] for g in optimizer.param_groups if g.get(
+                "group_type") == "head"), default=0.0)
+            max_lr_backbone = max((g["lr"] for g in optimizer.param_groups if g.get(
+                "group_type") == "backbone"), default=0.0)
 
             # Récupération de la valeur du scale si FP16 activé
             scale_val = scaler.get_scale() if is_fp16 else 1.0
             scale_str = f" | scale {scale_val:.0f}" if is_fp16 else ""
 
             logger.info(
-                f"step {global_step} | loss  pour le rank 0 {running_loss / (i + 1):.4f} | max_lr {max_lr:.2e}{scale_str}")
+                f"step {global_step} | loss pour le rank 0 {running_loss / (i + 1):.4f} | max head lr {max_lr_head:.2e}| max backbone lr {max_lr_backbone:.2e} {scale_str}")
 
     return global_step, running_loss / max(1, len(loader))
 

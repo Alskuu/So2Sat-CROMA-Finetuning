@@ -129,6 +129,7 @@ def main():
         sampler=train_sampler, num_workers=cfg.num_workers, pin_memory=True,
         persistent_workers=cfg.num_workers > 0,
     )
+
     val_loader = DataLoader(
         val_ds, batch_size=cfg.batch_size, shuffle=False,
         sampler=val_sampler,

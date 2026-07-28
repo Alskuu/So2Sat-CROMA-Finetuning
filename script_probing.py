@@ -68,7 +68,8 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
         optimizer = torch.optim.Adam(probe.classifier.parameters(), lr=1e-3)
         criterion = nn.CrossEntropyLoss()
 
-        best_val_loss = float("inf")
+        # L'Average Accuracy
+        best_val_aa = 0
         patience = 30  # nombre d'epochs sans amélioration avant d'arrêter
         epochs_without_improvement = 0
 
@@ -104,27 +105,51 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
             val_loss = 0.0
             val_correct = 0
             val_total = 0
+            all_preds = []
+            all_labels = []
 
             with torch.no_grad():
                 for features, labels in val_features_loader:
                     logits = probe(features.to(device))
-                    val_loss += criterion(logits, labels.to(device)).item()
+                    labels_gpu = labels.to(device)
+                    val_loss += criterion(logits, labels_gpu).item()
+                    preds = logits.argmax(dim=1)
                     val_correct += (logits.argmax(dim=1) ==
                                     labels.to(device)).sum().item()
                     val_total += labels.size(0)
+
+                    all_preds.append(preds.cpu())
+                    all_labels.append(labels)
+
             val_loss /= len(val_features_loader)
             val_acc = val_correct / val_total
+            # Ajout calcul de l'AA (Average Accuracy)
+            all_preds = torch.cat(all_preds).numpy()
+            all_labels = torch.cat(all_labels).numpy()
+            n_classes = logits.shape[1]
+            cm = confusion_matrix(all_labels, all_preds,
+                                  labels=np.arange(n_classes))
+            row_sums = cm.sum(axis=1)
+            # éviter division par zéro si une classe est absente du val set sur ce batch
+            per_class_acc = np.divide(
+                np.diag(cm), row_sums,
+                out=np.zeros(n_classes, dtype=float),
+                where=row_sums != 0
+            )
+            # ne moyenner que sur les classes réellement présentes dans le val set
+            present = row_sums != 0
+            val_aa = per_class_acc[present].mean()
 
             print(
                 f"Epoch {epoch:3d} | "
-                f"train loss: {train_loss:.4f} | train acc: {train_acc:.3f} | "
-                f"val loss: {val_loss:.4f} | val acc: {val_acc:.3f} | "
+                f"train loss: {train_loss:.4f} | train OA: {train_acc:.3f} | "
+                f"val loss: {val_loss:.4f} | val OA: {val_acc:.3f} | val AA: {val_aa:.4f} "
                 f"patience: {epochs_without_improvement}/{patience}"
-                + (" validé : best" if val_loss < best_val_loss else "")
+                + (" validé : best" if val_aa > best_val_aa else "")
             )
 
-            if val_loss < best_val_loss - epsilon:
-                best_val_loss = val_loss
+            if val_aa > best_val_aa - epsilon:
+                best_val_aa = val_aa
                 epochs_without_improvement = 0
                 print("Meilleur modèle sauvegardé !")
                 if linear:
@@ -147,7 +172,7 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
             epoch += 1
 
         print(
-            f"\nEntraînement terminé — {epoch} epochs | meilleure val loss: {best_val_loss:.4f}")
+            f"\nEntraînement terminé — {epoch} epochs | meilleure val loss: {best_val_aa:.4f}")
 
     else:
         if interpolation_mtd is not None:
