@@ -7,7 +7,7 @@
 #SBATCH --nodes=1                       # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)
 #SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=6                # 1/8 du noeud par GPU sur gpu_p5, ne pas changer même si ntasks-per-node < 8
-#SBATCH --account=rsn@v100          # Adapte la clé de projet (ex: @v100 ou @a100)
+#SBATCH --account=rsn@v100          # La clé de projet et le besoin de gpus v100
 #SBATCH --gres=gpu:2
 #SBATCH --hint=nomultithread
 #SBATCH --time=01:30:00                  # Comme on sait qu'un epoch dure 40 minutes environ, on sait qu'à partir de 1h30, l'epoch sera interrompu au milieu

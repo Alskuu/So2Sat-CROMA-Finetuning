@@ -23,6 +23,7 @@ from finetuning import (
     save_checkpoint,
     load_checkpoint,
     save_confusion_matrix,
+    log_confusion_matrix_text,
     PreemptionFlag,
 )
 from sampler import SequentialDistributedSampler
@@ -34,6 +35,28 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()  # Affiche aussi dans le terminal
                     ])
 logger = logging.getLogger(__name__)
+
+
+def setup_secondary_logger(name: str, log_file: Path) -> logging.Logger:
+    """
+    Crée un logger indépendant qui écrit EXCLUSIVEMENT dans un fichier dédié.
+    """
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Configuration du handler de fichier
+    file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    file_handler.setFormatter(formatter)
+
+    # Initialisation du logger secondaire
+    sec_logger = logging.getLogger(name)
+    sec_logger.setLevel(logging.INFO)
+    sec_logger.addHandler(file_handler)
+
+    # CRUCIAL : évite que les logs remontent au logger principal / terminal (stdout)
+    sec_logger.propagate = False
+
+    return sec_logger
 
 # --------------------------------------------------------------------------- #
 # Main
@@ -174,8 +197,11 @@ def main():
         global_step, train_loss = train_one_epoch(
             model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts
         )
+        cm_logger = None
         if rank == 0:
+            cm_log_path = "logs/confusion_matrices.log"
             logger.info(f"Epoch {epoch} | train_loss {train_loss:.4f}")
+            cm_logger = setup_secondary_logger("confusion_logger", cm_log_path)
             # Synchronize signal status across all ranks
         is_preempted = killer.synchronize(is_distributed)
 
@@ -199,8 +225,9 @@ def main():
                         f"Pas d'amélioration <= {cfg.early_stop_epsilon} de l'AA \n ({epochs_without_improvement}/{cfg.patience} étapes sans améliorations)"
                     )
         if rank == 0:
-            save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
-                cfg.checkpoint_dir) / "figures/confusion_last.png")
+            # Écrit UNIQUEMENT dans checkpoint/logs/confusion_matrices.log
+            log_confusion_matrix_text(
+                all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True)
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 
