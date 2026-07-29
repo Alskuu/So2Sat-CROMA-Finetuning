@@ -22,6 +22,7 @@ from finetuning import (
     evaluate,
     save_checkpoint,
     load_checkpoint,
+    save_confusion_matrix,
     PreemptionFlag,
 )
 from sampler import SequentialDistributedSampler
@@ -37,6 +38,17 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+
+
+# Noms officiels des 17 classes LCZ (Local Climate Zones) de So2Sat
+LCZ_CLASSES = [
+    "1. Compact high-rise", "2. Compact mid-rise", "3. Compact low-rise",
+    "4. Open high-rise", "5. Open mid-rise", "6. Open low-rise",
+    "7. Lightweight low-rise", "8. Large low-rise", "9. Sparsely built",
+    "10. Heavy industry", "A. Dense trees", "B. Scattered trees",
+    "C. Bush, scrub", "D. Low plants", "E. Bare rock/paved",
+    "F. Bare soil/sand", "G. Water"
+]
 
 
 def build_argparser():
@@ -149,12 +161,18 @@ def main():
 
     total_steps = cfg.epochs * len(train_loader)
 
+    # Compte le nombre d'apparition de chaque label dans l'ordre officiel LCZ
+    train_counts = torch.tensor([
+        5068, 24431, 31693, 8651, 16493, 35290, 3269, 39326,
+        13584, 11954, 42902, 9514, 9165, 41377, 2392, 7898, 49359
+    ], dtype=torch.float32)
+
     for epoch in range(start_epoch+1, cfg.epochs):
         if is_distributed:
             train_sampler.set_epoch(epoch)
 
         global_step, train_loss = train_one_epoch(
-            model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed
+            model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts
         )
         if rank == 0:
             logger.info(f"Epoch {epoch} | train_loss {train_loss:.4f}")
@@ -162,14 +180,16 @@ def main():
         is_preempted = killer.synchronize(is_distributed)
 
         if epoch % cfg.eval_every == 0 and not is_preempted:
-            oa, aa = evaluate(model, val_loader, device,
-                              world_size, len(val_ds), is_distributed)
+            oa, aa, all_preds, all_targets = evaluate(model, val_loader, device,
+                                                      world_size, len(val_ds), is_distributed)
 
             logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
             if aa > best_metric + cfg.early_stop_epsilon:
                 best_metric = aa
                 epochs_without_improvement = 0
                 if rank == 0:
+                    save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
+                        cfg.checkpoint_dir) / "figures/confusion_best.png")
                     save_checkpoint(Path(cfg.checkpoint_dir) / "best.pt",
                                     model, optimizer, scaler, epoch, global_step, best_metric, epochs_without_improvement)
             else:
@@ -179,6 +199,8 @@ def main():
                         f"Pas d'amélioration <= {cfg.early_stop_epsilon} de l'AA \n ({epochs_without_improvement}/{cfg.patience} étapes sans améliorations)"
                     )
         if rank == 0:
+            save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
+                cfg.checkpoint_dir) / "figures/confusion_last.png")
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 
