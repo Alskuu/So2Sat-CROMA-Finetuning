@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=croma_ft
-#SBATCH --output=logs/croma_ft_%j.out
-#SBATCH --error=logs/croma_ft_%j.out
+#SBATCH --output=logs/croma_ft_20h_%j.out
+#SBATCH --error=logs/croma_ft_20h_%j.out
 #SBATCH --qos=qos_gpu-t3                 # QoS max 20h sur du V100
 #SBATCH --partition=gpu_p2                # Cas des 32 Go de VRAM
 #SBATCH --nodes=1                       # augmente si tu veux du multi-noeud (le mapping RANK/WORLD_SIZE plus bas s'adapte automatiquement)

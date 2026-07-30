@@ -592,111 +592,113 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
 
     return global_step, running_loss / max(1, len(loader))
 
-    @torch.inference_mode()
-    def evaluate(model, loader, device, world_size, num_val_samples, is_distributed):
-        model.eval()
-        all_preds = []
-        all_targets = []
 
-        for sar, optical, labels in loader:
-            sar, optical = sar.to(device), optical.to(device)
-            outputs = model(sar, optical)
-            preds = torch.argmax(outputs, dim=1)
+@torch.inference_mode()
+def evaluate(model, loader, device, world_size, num_val_samples, is_distributed):
+    model.eval()
+    all_preds = []
+    all_targets = []
 
-            all_preds.append(preds)
-            all_targets.append(labels.to(device))
+    for sar, optical, labels in loader:
+        sar, optical = sar.to(device), optical.to(device)
+        outputs = model(sar, optical)
+        preds = torch.argmax(outputs, dim=1)
 
-        preds_local = torch.cat(all_preds)
-        targets_local = torch.cat(all_targets)
+        all_preds.append(preds)
+        all_targets.append(labels.to(device))
 
-        if is_distributed:
-            # We gather all predictions and labels across GPUs to calculate the exact validation score
-            full_preds = torch.empty(
-                preds_local.numel() * world_size,
-                dtype=preds_local.dtype,
-                device=device
-            )
-            full_targets = torch.empty(
-                targets_local.numel() * world_size,
-                dtype=targets_local.dtype,
-                device=device
-            )
+    preds_local = torch.cat(all_preds)
+    targets_local = torch.cat(all_targets)
 
-            # DIRECT COLLECTIVE COMMUNICATION GPU-TO-GPU (NCCL)
-            # Very fast exchange between tensors, without going through the CPU neither with "pickle"
-            torch.distributed.all_gather_into_tensor(full_preds, preds_local)
-            torch.distributed.all_gather_into_tensor(
-                full_targets, targets_local)
-        else:
-            full_preds = preds_local
-            full_targets = targets_local
-
-        # Thanks to the SequentialDistributedSampler, all the padding is at the end of full_preds.
-        # We truncate to the exact size for rigorous and duplicate-free metric computation.
-        full_preds = full_preds[:num_val_samples]
-        full_targets = full_targets[:num_val_samples]
-
-        # Calculate the Global Exactitude (OA - Overall Accuracy)
-        correct = (full_preds == full_targets).float().sum().item()
-        oa = correct / num_val_samples
-
-        # Calculate the Mean Exactitude (AA - Average Accuracy)
-        # We recover all the unique classes that are in the validation dataset
-        unique_classes = torch.unique(full_targets)
-        class_accuracies = []
-        for c in unique_classes:
-            class_mask = (full_targets == c)
-            if class_mask.sum() > 0:
-                class_acc = (full_preds[class_mask] == c).float().mean().item()
-                class_accuracies.append(class_acc)
-
-        aa = sum(class_accuracies) / \
-            len(class_accuracies) if class_accuracies else 0.0
-
-        full_preds_np = full_preds.cpu().numpy()
-        full_targets_np = full_targets.cpu().numpy()
-
-        return oa, aa, full_preds_np, full_targets_np
-
-    def save_confusion_matrix(
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
-        class_names: list,
-        save_path: str,
-        normalize: bool = True
-    ):
-        """
-        Shows a normalized (or not) confusion matrix
-        """
-        cm = confusion_matrix(y_true, y_pred)
-
-        if normalize:
-            cm = cm.astype('float') / (cm.sum(axis=1, keepdims=True) + 1e-8)
-            fmt = '.2f'
-            title = 'Matrice de Confusion Normalisée (%)'
-        else:
-            fmt = 'd'
-            title = 'Matrice de Confusion (Comptes Bruts)'
-
-        plt.figure(figsize=(12, 10))
-        sns.heatmap(
-            cm,
-            annot=True,
-            fmt=fmt,
-            cmap='Blues',
-            xticklabels=class_names,
-            yticklabels=class_names,
-            cbar=True
+    if is_distributed:
+        # We gather all predictions and labels across GPUs to calculate the exact validation score
+        full_preds = torch.empty(
+            preds_local.numel() * world_size,
+            dtype=preds_local.dtype,
+            device=device
         )
-        plt.title(title, fontsize=14, fontweight='bold', pad=15)
-        plt.ylabel('Vraie Classe (Ground Truth)', fontsize=12)
-        plt.xlabel('Classe Prédite', fontsize=12)
-        plt.xticks(rotation=45, ha='right')
-        plt.yticks(rotation=0)
-        plt.tight_layout()
-        if save_path is not None:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Matrice de confusion sauvegardée ici : {save_path}")
+        full_targets = torch.empty(
+            targets_local.numel() * world_size,
+            dtype=targets_local.dtype,
+            device=device
+        )
+
+        # DIRECT COLLECTIVE COMMUNICATION GPU-TO-GPU (NCCL)
+        # Very fast exchange between tensors, without going through the CPU neither with "pickle"
+        torch.distributed.all_gather_into_tensor(full_preds, preds_local)
+        torch.distributed.all_gather_into_tensor(
+            full_targets, targets_local)
+    else:
+        full_preds = preds_local
+        full_targets = targets_local
+
+    # Thanks to the SequentialDistributedSampler, all the padding is at the end of full_preds.
+    # We truncate to the exact size for rigorous and duplicate-free metric computation.
+    full_preds = full_preds[:num_val_samples]
+    full_targets = full_targets[:num_val_samples]
+
+    # Calculate the Global Exactitude (OA - Overall Accuracy)
+    correct = (full_preds == full_targets).float().sum().item()
+    oa = correct / num_val_samples
+
+    # Calculate the Mean Exactitude (AA - Average Accuracy)
+    # We recover all the unique classes that are in the validation dataset
+    unique_classes = torch.unique(full_targets)
+    class_accuracies = []
+    for c in unique_classes:
+        class_mask = (full_targets == c)
+        if class_mask.sum() > 0:
+            class_acc = (full_preds[class_mask] == c).float().mean().item()
+            class_accuracies.append(class_acc)
+
+    aa = sum(class_accuracies) / \
+        len(class_accuracies) if class_accuracies else 0.0
+
+    full_preds_np = full_preds.cpu().numpy()
+    full_targets_np = full_targets.cpu().numpy()
+
+    return oa, aa, full_preds_np, full_targets_np
+
+
+def save_confusion_matrix(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    class_names: list,
+    save_path: str,
+    normalize: bool = True
+):
+    """
+    Shows a normalized (or not) confusion matrix
+    """
+    cm = confusion_matrix(y_true, y_pred)
+
+    if normalize:
+        cm = cm.astype('float') / (cm.sum(axis=1, keepdims=True) + 1e-8)
+        fmt = '.2f'
+        title = 'Matrice de Confusion Normalisée (%)'
+    else:
+        fmt = 'd'
+        title = 'Matrice de Confusion (Comptes Bruts)'
+
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt=fmt,
+        cmap='Blues',
+        xticklabels=class_names,
+        yticklabels=class_names,
+        cbar=True
+    )
+    plt.title(title, fontsize=14, fontweight='bold', pad=15)
+    plt.ylabel('Vraie Classe (Ground Truth)', fontsize=12)
+    plt.xlabel('Classe Prédite', fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Matrice de confusion sauvegardée ici : {save_path}")
 
 
 def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normalize=True):
