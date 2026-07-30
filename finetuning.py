@@ -715,6 +715,7 @@ def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normal
         fmt = "{:d}"
         title = f"MATRICE DE CONFUSION (Comptes Bruts) de l'epoch {epoch}"
 
+    # So we have the names in short that appear once and the entire names that entire once
     short_labels = [name.split('.')[0].strip() for name in class_names]
     df_cm = pd.DataFrame(cm, index=class_names, columns=short_labels)
 
@@ -725,8 +726,8 @@ def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normal
         log_msg = (
             f"\n=== {title} ===\n"
             f"""Légende colonnes : {', '.join([f'{s}={full}' for s, full in zip(
-                short_labels, class_names)])}\n\n"
-            f"{df_cm.to_string()}\n"""
+                short_labels, class_names)])}\n\n"""
+            f"{df_cm.to_string()}\n"
             f"=" * 80
         )
         logger.info(log_msg)
