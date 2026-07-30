@@ -188,6 +188,9 @@ def main():
         13584, 11954, 42902, 9514, 9165, 41377, 2392, 7898, 49359
     ], dtype=torch.float32)
 
+    cm_log_path = "logs/confusion_matrices.log"
+    cm_logger = setup_secondary_logger("confusion_logger", cm_log_path)
+
     for epoch in range(start_epoch+1, cfg.epochs):
         if is_distributed:
             train_sampler.set_epoch(epoch)
@@ -195,11 +198,8 @@ def main():
         global_step, train_loss = train_one_epoch(
             model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts
         )
-        cm_logger = None
         if rank == 0:
-            cm_log_path = "logs/confusion_matrices.log"
             logger.info(f"Epoch {epoch} | train_loss {train_loss:.4f}")
-            cm_logger = setup_secondary_logger("confusion_logger", cm_log_path)
             # Synchronize signal status across all ranks
         is_preempted = killer.synchronize(is_distributed)
 
@@ -223,9 +223,12 @@ def main():
                         f"Pas d'amélioration <= {cfg.early_stop_epsilon} de l'AA \n ({epochs_without_improvement}/{cfg.patience} étapes sans améliorations)"
                     )
         if rank == 0:
-            # Écrit UNIQUEMENT dans checkpoint/logs/confusion_matrices.log
-            log_confusion_matrix_text(
-                all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True)
+            logger.info(
+                "Ecriture sur le deuxième logger dans confusion_matrices.log")
+            if epoch % cfg.eval_every == 0:
+                # Écrit UNIQUEMENT dans checkpoint/logs/confusion_matrices.log
+                log_confusion_matrix_text(
+                    all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True)
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 

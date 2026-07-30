@@ -33,12 +33,17 @@ srun bash -c '
     export RANK=$SLURM_PROCID
     export LOCAL_RANK=$SLURM_LOCALID
     export WORLD_SIZE=$SLURM_NTASKS 
+    trap "echo received SIGTERM in bash wrapper; kill -TERM \$PID" SIGTERM
     python -u script_finetuning.py \
         --data-dir "$DATA_DIR" \
         --checkpoint-dir "$CKPT_DIR" \
         --backbone-checkpoint "$BACKBONE_CKPT" \
         --batch-size 64 \
         --num-workers 4
+    &
+    PID=$!
+    wait $PID
+    # Dans le echo \$PID retarde l'évaluation au moment où le trap se déclenche réellement quand PID aura une vraie valeur
     # --resume est activé par défaut (cfg.resume=True) : si $CKPT_DIR/last.pt existe déjà
     # (ex: après un --requeue suite à une préemption), le run reprendra automatiquement.
 '
