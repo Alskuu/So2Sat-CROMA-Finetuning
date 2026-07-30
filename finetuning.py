@@ -722,9 +722,9 @@ def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normal
 
         log_msg = (
             f"\n=== {title} ===\n"
-            f"Légende colonnes : {', '.join([f'{s}={full}' for s, full in zip(
+            f"""Légende colonnes : {', '.join([f'{s}={full}' for s, full in zip(
                 short_labels, class_names)])}\n\n"
-            f"{df_cm.to_string()}\n"
+            f"{df_cm.to_string()}\n"""
             f"=" * 80
         )
         logger.info(log_msg)
