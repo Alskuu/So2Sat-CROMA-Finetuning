@@ -41,8 +41,6 @@ def setup_secondary_logger(name: str, log_file: Path) -> logging.Logger:
     """
     Crée un logger indépendant qui écrit EXCLUSIVEMENT dans un fichier dédié.
     """
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-
     # Configuration du handler de fichier
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
