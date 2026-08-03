@@ -191,6 +191,10 @@ def main():
     cm_log_path = "logs/confusion_matrices.log"
     cm_logger = setup_secondary_logger("confusion_logger", cm_log_path)
 
+    logger.info(f"Nombre de handlers : {len(cm_logger.handlers)}")
+    for i, h in enumerate(cm_logger.handlers):
+        logger.info(f"{i} : {h}")
+
     for epoch in range(start_epoch+1, cfg.epochs):
         if is_distributed:
             train_sampler.set_epoch(epoch)
