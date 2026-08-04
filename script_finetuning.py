@@ -37,12 +37,17 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 
-def setup_secondary_logger(name: str, log_file: Path) -> logging.Logger:
+def setup_secondary_logger(name: str, log_file: Path, epoch: int) -> logging.Logger:
     """
     Crée un logger indépendant qui écrit EXCLUSIVEMENT dans un fichier dédié.
     """
     # Configuration du handler de fichier
-    file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+    if epoch == 1:
+        file_handler = logging.FileHandler(
+            log_file, mode='w', encoding='utf-8')
+    else:
+        file_handler = logging.FileHandler(
+            log_file, mode='a', encoding='utf-8')
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     file_handler.setFormatter(formatter)
 
@@ -189,13 +194,12 @@ def main():
     ], dtype=torch.float32)
 
     cm_log_path = "logs/confusion_matrices.log"
-    cm_logger = setup_secondary_logger("confusion_logger", cm_log_path)
-
-    logger.info(f"Nombre de handlers : {len(cm_logger.handlers)}")
-    for i, h in enumerate(cm_logger.handlers):
-        logger.info(f"{i} : {h}")
 
     for epoch in range(start_epoch+1, cfg.epochs):
+
+        cm_logger = setup_secondary_logger(
+            "confusion_logger", cm_log_path, epoch)
+
         if is_distributed:
             train_sampler.set_epoch(epoch)
 
@@ -232,7 +236,7 @@ def main():
             if epoch % cfg.eval_every == 0:
                 # Écrit UNIQUEMENT dans checkpoint/logs/confusion_matrices.log
                 log_confusion_matrix_text(
-                    all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True)
+                    all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True, rank)
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 

@@ -701,12 +701,13 @@ def save_confusion_matrix(
         print(f"Matrice de confusion sauvegardée ici : {save_path}")
 
 
-def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normalize=True):
+def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normalize=True, rank=0):
     if logger is None:
         return
 
     cm = confusion_matrix(y_true, y_pred)
 
+    print(f"ENTER log_confusion_matrix_text rank={rank} epoch={epoch}")
     if normalize:
         cm = cm.astype('float') / (cm.sum(axis=1, keepdims=True) + 1e-8) * 100
         fmt = "{:.1f}"
