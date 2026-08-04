@@ -37,30 +37,6 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 
-def setup_secondary_logger(name: str, log_file: Path, epoch: int) -> logging.Logger:
-    """
-    Crée un logger indépendant qui écrit EXCLUSIVEMENT dans un fichier dédié.
-    """
-    # Configuration du handler de fichier
-    if epoch == 1:
-        file_handler = logging.FileHandler(
-            log_file, mode='w', encoding='utf-8')
-    else:
-        file_handler = logging.FileHandler(
-            log_file, mode='a', encoding='utf-8')
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    file_handler.setFormatter(formatter)
-
-    # Initialisation du logger secondaire
-    sec_logger = logging.getLogger(name)
-    sec_logger.setLevel(logging.INFO)
-    sec_logger.addHandler(file_handler)
-
-    # CRUCIAL : évite que les logs remontent au logger principal / terminal (stdout)
-    sec_logger.propagate = False
-
-    return sec_logger
-
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
@@ -124,6 +100,8 @@ def main():
     Path(cfg.checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     is_distributed, device, local_rank, rank, world_size = setup_hardware_and_distributed()
+
+    logger.info(f"Taille du World Size ")
 
     backbone = load_croma_backbone(
         cfg.backbone_checkpoint, size=cfg.backbone_size, image_resolution=cfg.image_resolution)
@@ -193,12 +171,7 @@ def main():
         13584, 11954, 42902, 9514, 9165, 41377, 2392, 7898, 49359
     ], dtype=torch.float32)
 
-    cm_log_path = "logs/confusion_matrices.log"
-
     for epoch in range(start_epoch+1, cfg.epochs):
-
-        cm_logger = setup_secondary_logger(
-            "confusion_logger", cm_log_path, epoch)
 
         if is_distributed:
             train_sampler.set_epoch(epoch)
@@ -230,13 +203,11 @@ def main():
                     logger.info(
                         f"Pas d'amélioration <= {cfg.early_stop_epsilon} de l'AA \n ({epochs_without_improvement}/{cfg.patience} étapes sans améliorations)"
                     )
+                    save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
+                        cfg.checkpoint_dir) / f"figures/confusion_{epoch}.png")
         if rank == 0:
             logger.info(
                 "Ecriture sur le deuxième logger dans confusion_matrices.log")
-            if epoch % cfg.eval_every == 0:
-                # Écrit UNIQUEMENT dans checkpoint/logs/confusion_matrices.log
-                log_confusion_matrix_text(
-                    all_targets, all_preds, LCZ_CLASSES, epoch, cm_logger, normalize=True, rank)
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 
