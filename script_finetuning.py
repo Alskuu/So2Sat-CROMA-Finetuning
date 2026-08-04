@@ -23,7 +23,6 @@ from finetuning import (
     save_checkpoint,
     load_checkpoint,
     save_confusion_matrix,
-    log_confusion_matrix_text,
     PreemptionFlag,
 )
 from sampler import SequentialDistributedSampler

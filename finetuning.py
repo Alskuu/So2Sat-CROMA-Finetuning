@@ -699,36 +699,3 @@ def save_confusion_matrix(
     if save_path is not None:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Matrice de confusion sauvegardée ici : {save_path}")
-
-
-def log_confusion_matrix_text(y_true, y_pred, class_names, epoch, logger, normalize=True, rank=0):
-    if logger is None:
-        return
-
-    cm = confusion_matrix(y_true, y_pred)
-
-    print(f"ENTER log_confusion_matrix_text rank={rank} epoch={epoch}")
-    if normalize:
-        cm = cm.astype('float') / (cm.sum(axis=1, keepdims=True) + 1e-8) * 100
-        fmt = "{:.1f}"
-        title = f"MATRICE DE CONFUSION NORMALISÉE (%) de l'epoch {epoch}"
-    else:
-        fmt = "{:d}"
-        title = f"MATRICE DE CONFUSION (Comptes Bruts) de l'epoch {epoch}"
-
-    # So we have the names in short that appear once and the entire names that entire once
-    short_labels = [name.split('.')[0].strip() for name in class_names]
-    df_cm = pd.DataFrame(cm, index=class_names, columns=short_labels)
-
-    with pd.option_context('display.max_columns', 20,
-                           'display.width', 1000,
-                           'display.float_format', fmt.format):
-
-        log_msg = (
-            f"\n=== {title} ===\n"
-            f"""Légende colonnes : {', '.join([f'{s}={full}' for s, full in zip(
-                short_labels, class_names)])}\n\n"""
-            f"{df_cm.to_string()}\n"
-            f"=" * 80
-        )
-        logger.info(log_msg)
