@@ -12,14 +12,14 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
     TARGET_SIZE = image_resolution
     if train:
         train_dataset = So2SatDataset(h5_path="D:/LCZ42/training.h5", image_resolution=TARGET_SIZE,
-                                      urban_only=False,
+                                      urban_only=True,
                                       selected_classes=None,
                                       remap_labels=False,
                                       interpolation_mtd=interpolation_mtd
                                       )
 
         val_dataset = So2SatDataset(h5_path="D:/LCZ42/validation.h5", image_resolution=TARGET_SIZE,
-                                    urban_only=False,
+                                    urban_only=True,
                                     selected_classes=None,
                                     remap_labels=False,
                                     interpolation_mtd=interpolation_mtd
@@ -46,7 +46,7 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
             cache_name="train",
             force_recompute=force_recompute
         )
-        '''
+
         val_features, val_labels = extract_features_from_loader(
             dataloader=val_loader,
             pretrained_path="D:/CROMA_weights/CROMA_base.pt",
@@ -59,11 +59,11 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
             cache_name="val",
             force_recompute=force_recompute
         )
-        '''
+
         print("Extraction terminée, features sauvegardées dans cache/")
     else:
         test_dataset = So2SatDataset(h5_path="D:/LCZ42/testing.h5", image_resolution=TARGET_SIZE,
-                                     urban_only=False,
+                                     urban_only=True,
                                      selected_classes=None,
                                      remap_labels=False,
                                      interpolation_mtd=interpolation_mtd
@@ -92,7 +92,8 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
 
 if __name__ == "__main__":
     start_time = time.time()
-    # script(False, "nearest", image_resolution=120, modality="both", force_recompute=True)
+    script(False, "nearest", image_resolution=120,
+           modality="both", force_recompute=True)
     script(True, "nearest", image_resolution=120,
            modality="both", force_recompute=True)
     # script(True, "bilinear", image_resolution=120,

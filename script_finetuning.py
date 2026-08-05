@@ -131,9 +131,9 @@ def main():
             model, device_ids=[local_rank], find_unused_parameters=True)
 
     train_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution)
+        h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=True)
     val_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/validation.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution)
+        h5_path=cfg.data_dir+"/validation.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=True)
 
     train_sampler = DistributedSampler(train_ds) if is_distributed else None
     val_sampler = SequentialDistributedSampler(

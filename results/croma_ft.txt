@@ -1,0 +1,6 @@
+Résultats CROMA full finetuning : 
+
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 68.54%
+Average Accuracy (AA) : 62.83%
+Macro-F1 :59.20%
