@@ -57,10 +57,12 @@ Accuracy par classe :
   LCZ 17 : 0.9831 (98.31%)
 
   Sur du urban only en nearest : 
+Résultats du test pour 120 pixels avec la méthode nearest en linear probing
+
 ══════════════════════════════════════════
         Résultats — Test set
 ══════════════════════════════════════════
-  Overall Accuracy (OA)  : 0.6205 (62.05%)
-  Average Accuracy (AA)  : 0.5171 (51.71%)
-  Macro F1               : 0.5321
+  Overall Accuracy (OA)  : 0.6255 (62.55%)
+  Average Accuracy (AA)  : 0.5213 (52.13%)
+  Macro F1               : 0.5412
 ══════════════════════════════════════════

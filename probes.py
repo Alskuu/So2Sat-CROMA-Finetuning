@@ -11,7 +11,7 @@ class CROMALinearProbe(nn.Module):
     Les images reçues doivent être déjà normalisées (z-score par canal).
     """
 
-    def __init__(self, pretrained_path: str, image_resolution: int = TARGET_SIZE, modality: str = 'both', joint: bool = False, num_classes: int = 17) -> None:
+    def __init__(self, pretrained_path: str, num_classes: int, image_resolution: int = TARGET_SIZE, modality: str = 'both', joint: bool = False) -> None:
         super().__init__()
         assert modality in {"both", "SAR", "optical"}, \
             f"modality invalide : {modality!r}"

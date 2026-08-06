@@ -16,7 +16,6 @@ class So2SatDataset(Dataset):
     """
 
     def __init__(self, h5_path: str, interpolation_mtd: Optional[str], image_resolution: int = TARGET_SIZE, urban_only: bool = False,
-                 selected_classes: Optional[Iterable[int]] = None,
                  remap_labels: bool = True) -> None:
         super().__init__()
         self.h5_path = h5_path
@@ -28,13 +27,6 @@ class So2SatDataset(Dataset):
 
         self.selected_classes = None
         self.label_mapping = None
-        if selected_classes is not None:
-            self.selected_classes = sorted(
-                set(int(c) for c in selected_classes))
-            if self.remap_labels:
-                self.label_mapping = {
-                    orig: new for new, orig in enumerate(self.selected_classes)
-                }
 
         with h5py.File(self.h5_path, "r") as f:
             class_idx = np.argmax(f["label"][:], axis=1)
@@ -42,8 +34,6 @@ class So2SatDataset(Dataset):
             mask = np.ones_like(class_idx, dtype=bool)
             if self.urban_only:
                 mask &= class_idx < 10
-            if self.selected_classes is not None:
-                mask &= np.isin(class_idx, self.selected_classes)
             self.indices = np.where(mask)[0]
             self._length = len(self.indices)
 

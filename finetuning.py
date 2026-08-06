@@ -56,7 +56,6 @@ logger = logging.getLogger(__name__)
 JOINT_EMBED_KEY = "joint_GAP"
 # On a deux choix entre la concaténation du SAR et de l'optique (dim=1536) ou bien la jointure des deux (dim=768)
 EMBED_DIM = 768
-NUM_CLASSES = 17  # So2Sat LCZ42: 10 construites + 7 classes LCZ naturelles
 
 
 @dataclass
@@ -122,7 +121,7 @@ class CROMAFineTuning(nn.Module):
     def __init__(
         self,
         backbone: nn.Module,
-        num_classes: int = NUM_CLASSES,
+        num_classes: int,
         embed_dim: int = EMBED_DIM,
         freeze_n_layers: int = 0,
         use_gradient_checkpointing: bool = True,
@@ -348,23 +347,6 @@ def cosine_warmup_lr_lambda(step: int, warmup_steps: int, total_steps: int):
         return step / max(1, warmup_steps)
     progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
     return 0.5 * (1.0 + math.cos(math.pi * progress))
-
-
-# --------------------------------------------------------------------------- #
-# Metrics: OA / AA, as decided during the probing phase
-# --------------------------------------------------------------------------- #
-def compute_oa_aa(preds: torch.Tensor, labels: torch.Tensor, num_classes: int = NUM_CLASSES):
-    correct = (preds == labels).sum().item()
-    total = labels.numel()
-    oa = correct / total if total > 0 else 0.0
-
-    per_class_acc = []
-    for c in range(num_classes):
-        mask = labels == c
-        if mask.sum() > 0:
-            per_class_acc.append((preds[mask] == c).float().mean().item())
-    aa = sum(per_class_acc) / len(per_class_acc) if per_class_acc else 0.0
-    return oa, aa
 
 # ---------------------------------------------------------------------------- #
 # Get access to the set up and do some loggings to show it
