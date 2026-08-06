@@ -59,7 +59,7 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
                 pretrained_path=pretrained_path,
                 modality="both",
                 joint=True,
-                num_classes=17,
+                num_classes=10,
             ).to(device)
         else:
             probe = CROMAMLProbe(
@@ -195,7 +195,7 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
             probe = CROMALinearProbe(pretrained_path=pretrained_path,
                                      modality="both",
                                      joint=True,
-                                     num_classes=17,).to(device)
+                                     num_classes=10,).to(device)
             if interpolation_mtd is not None:
                 probe.classifier.load_state_dict(torch.load(
                     f"best_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location=device))

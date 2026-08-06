@@ -5,6 +5,7 @@ cache/
 UntitledCroma.ipynb
 checkpoints/best_linear_probe_optical_bilinear_120.pt
 checkpoints/best_linear_probe_optical_nearest_120.pt
+checkpoints/best_linear_probe_both_nearest_120.pt
 checkpoints/best_head.pt
 checkpoints/best_backbone.pt
 lr_range_test_inutile/

@@ -57,10 +57,10 @@ Accuracy par classe :
   LCZ 17 : 0.9831 (98.31%)
 
   Sur du urban only en nearest : 
-  ══════════════════════════════════════════
+══════════════════════════════════════════
         Résultats — Test set
 ══════════════════════════════════════════
-  Overall Accuracy (OA)  : 0.6270 (62.70%)
-  Average Accuracy (AA)  : 0.5218 (52.18%)
-  Macro F1               : 0.5417
+  Overall Accuracy (OA)  : 0.6205 (62.05%)
+  Average Accuracy (AA)  : 0.5171 (51.71%)
+  Macro F1               : 0.5321
 ══════════════════════════════════════════

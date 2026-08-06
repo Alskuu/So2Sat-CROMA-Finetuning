@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader, DistributedSampler
 # (On suppose que dataset.py, finetuning.py et sample.py sont dans le même dossier)
 from dataset import So2SatDataset
 from finetuning import (
-    NUM_CLASSES,
     EMBED_DIM,
     FineTuneConfig,
     CROMAFineTuning,
@@ -39,17 +38,6 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
-
-
-# Noms officiels des 17 classes LCZ (Local Climate Zones) de So2Sat
-LCZ_CLASSES = [
-    "1. Compact high-rise", "2. Compact mid-rise", "3. Compact low-rise",
-    "4. Open high-rise", "5. Open mid-rise", "6. Open low-rise",
-    "7. Lightweight low-rise", "8. Large low-rise", "9. Sparsely built",
-    "10. Heavy industry", "A. Dense trees", "B. Scattered trees",
-    "C. Bush, scrub", "D. Low plants", "E. Bare rock/paved",
-    "F. Bare soil/sand", "G. Water"
-]
 
 
 def build_argparser():
@@ -88,7 +76,7 @@ def build_argparser():
     return p
 
 
-def main():
+def main(urban_only: bool):
     args = build_argparser().parse_args()
 
     cfg = FineTuneConfig(**vars(args))
@@ -106,9 +94,27 @@ def main():
         cfg.backbone_checkpoint, size=cfg.backbone_size, image_resolution=cfg.image_resolution)
     backbone = backbone.to(device)
 
+    if urban_only:
+        # Noms officiels des 10 classes LCZ urbaines de So2Sat
+        LCZ_CLASSES = [
+            "1. Compact high-rise", "2. Compact mid-rise", "3. Compact low-rise",
+            "4. Open high-rise", "5. Open mid-rise", "6. Open low-rise",
+            "7. Lightweight low-rise", "8. Large low-rise", "9. Sparsely built",
+            "10. Heavy industry"
+        ]
+    else:
+        # Noms officiels des 17 classes LCZ de So2Sat
+        LCZ_CLASSES = [
+            "1. Compact high-rise", "2. Compact mid-rise", "3. Compact low-rise",
+            "4. Open high-rise", "5. Open mid-rise", "6. Open low-rise",
+            "7. Lightweight low-rise", "8. Large low-rise", "9. Sparsely built",
+            "10. Heavy industry", "A. Dense trees", "B. Scattered trees",
+            "C. Bush, scrub", "D. Low plants", "E. Bare rock/paved",
+            "F. Bare soil/sand", "G. Water"
+        ]
     model = CROMAFineTuning(
         backbone=backbone,
-        num_classes=NUM_CLASSES,
+        num_classes=len(LCZ_CLASSES),
         embed_dim=EMBED_DIM,
         freeze_n_layers=cfg.freeze_n_layers,
         use_gradient_checkpointing=cfg.gradient_checkpointing,
@@ -131,9 +137,9 @@ def main():
             model, device_ids=[local_rank], find_unused_parameters=True)
 
     train_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=True)
+        h5_path=cfg.data_dir+"/training.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=urban_only)
     val_ds = So2SatDataset(
-        h5_path=cfg.data_dir+"/validation.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=True)
+        h5_path=cfg.data_dir+"/validation.h5", interpolation_mtd=cfg.interpolation_mtd, image_resolution=cfg.image_resolution, urban_only=urban_only)
 
     train_sampler = DistributedSampler(train_ds) if is_distributed else None
     val_sampler = SequentialDistributedSampler(
@@ -205,8 +211,6 @@ def main():
                     save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
                         cfg.checkpoint_dir) / f"figures/confusion_{epoch}.png")
         if rank == 0:
-            logger.info(
-                "Ecriture sur le deuxième logger dans confusion_matrices.log")
             save_checkpoint(last_ckpt, model, optimizer, scaler,
                             epoch, global_step, best_metric, epochs_without_improvement)
 
@@ -248,4 +252,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(True)
