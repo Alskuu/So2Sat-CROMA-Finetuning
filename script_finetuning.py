@@ -171,10 +171,16 @@ def main(urban_only: bool):
     total_steps = cfg.epochs * len(train_loader)
 
     # Compte le nombre d'apparition de chaque label dans l'ordre officiel LCZ
-    train_counts = torch.tensor([
-        5068, 24431, 31693, 8651, 16493, 35290, 3269, 39326,
-        13584, 11954, 42902, 9514, 9165, 41377, 2392, 7898, 49359
-    ], dtype=torch.float32)
+    if not urban_only:
+        train_counts = torch.tensor([
+            5068, 24431, 31693, 8651, 16493, 35290, 3269, 39326,
+            13584, 11954, 42902, 9514, 9165, 41377, 2392, 7898, 49359
+        ], dtype=torch.float32)
+    else:
+        train_counts = torch.tensor([
+            5068, 24431, 31693, 8651, 16493, 35290, 3269, 39326,
+            13584, 11954
+        ], dtype=torch.float32)
 
     for epoch in range(start_epoch+1, cfg.epochs):
 
