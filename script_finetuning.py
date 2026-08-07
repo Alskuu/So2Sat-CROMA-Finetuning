@@ -53,11 +53,11 @@ def build_argparser():
     p.add_argument("--image-resolution", type=int, default=120)
     p.add_argument("--interpolation-mtd", type=str, default="nearest",
                    choices=["bilinear", "nearest"])
-    p.add_argument("--patience", type=int, default=8)
+    p.add_argument("--patience", type=int, default=6)
     p.add_argument("--early-stop-epsilon", type=float, default=0.001)
     p.add_argument("--min-epochs", type=int, default=15)
     p.add_argument("--epochs", type=int, default=30)
-    p.add_argument("--batch-size", type=int, default=128)
+    p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--backbone-lr", type=float, default=2e-5)
     p.add_argument("--head-lr", type=float, default=2e-4)
     p.add_argument("--layer-decay", type=float, default=0.65)
@@ -188,7 +188,7 @@ def main(urban_only: bool):
             train_sampler.set_epoch(epoch)
 
         global_step, train_loss = train_one_epoch(
-            model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts
+            model, train_loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts, urban_only
         )
         if rank == 0:
             logger.info(f"Epoch {epoch} | train_loss {train_loss:.4f}")

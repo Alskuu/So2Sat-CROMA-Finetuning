@@ -70,7 +70,7 @@ class FineTuneConfig:
     # explicit override; bypasses checkpoint_dir/interpolation_mtd
     head_init_path: Optional[str] = None
     epochs: int = 30
-    batch_size: int = 128
+    batch_size: int = 64
     backbone_lr: float = 2e-5
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
     head_lr: float = 2e-4
@@ -92,7 +92,7 @@ class FineTuneConfig:
     log_every: int = 300
 
     # Early stopping (on the validation AA)
-    patience: int = 8
+    patience: int = 6
     early_stop_epsilon: float = 0.001
     min_epochs: int = 15
     logit_adj_tau: float = 1.0
@@ -495,7 +495,7 @@ def prepare_batch(batch, device: bool):
     return sar, optical, labels
 
 
-def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts):
+def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, total_steps, killer, rank, is_distributed, train_counts, urban_only):
     model.train()
     running_loss = 0.0
 
@@ -539,8 +539,14 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
         # It helps to get a total norm of all params that is slower than 1
         torch.nn.utils.clip_grad_norm_(all_params, max_norm=1.0)
         # Update the Learning Rate Scheduler
+        if urban_only:
+            # les classes naturelles représentent 41.88% du dataset et on ne travaillent pas sur eux
+            warmup_steps = cfg.warmup_steps*0.4188
+        else:
+            warmup_steps = cfg.warmup_steps
+
         lr_scale = cosine_warmup_lr_lambda(
-            global_step, cfg.warmup_steps, total_steps)
+            global_step, warmup_steps, total_steps)
 
         for g in optimizer.param_groups:
             g["lr"] = g["_base_lr"] * lr_scale
