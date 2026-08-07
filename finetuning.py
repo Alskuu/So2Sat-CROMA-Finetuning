@@ -71,7 +71,7 @@ class FineTuneConfig:
     head_init_path: Optional[str] = None
     epochs: int = 30
     batch_size: int = 64
-    backbone_lr: float = 2e-5
+    backbone_lr: float = 5e-5
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
     head_lr: float = 2e-4
     # LLRD factor, <1 => earlier layers get smaller LR : mostly 0.65 for ViT-Base and 0.75 for ViT-Large
@@ -541,7 +541,7 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
         # Update the Learning Rate Scheduler
         if urban_only:
             # les classes naturelles représentent 41.88% du dataset et on ne travaillent pas sur eux
-            warmup_steps = cfg.warmup_steps*0.4188
+            warmup_steps = cfg.warmup_steps*(1-0.4188)
         else:
             warmup_steps = cfg.warmup_steps
 
