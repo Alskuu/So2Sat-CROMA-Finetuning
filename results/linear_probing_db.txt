@@ -56,6 +56,33 @@ Accuracy par classe :
   LCZ 16 : 0.5035 (50.35%)
   LCZ 17 : 0.9831 (98.31%)
 
+Sur de l'optique en nearest : 
+══════════════════════════════════════════
+        Résultats — Test set
+══════════════════════════════════════════
+  Overall Accuracy (OA)  : 0.6488 (64.88%)
+  Average Accuracy (AA)  : 0.5149 (51.49%)
+  Macro F1               : 0.5131
+══════════════════════════════════════════
+Accuracy par classe :
+  LCZ  1 : 0.2669 (26.69%)
+  LCZ  2 : 0.5103 (51.03%)
+  LCZ  3 : 0.6860 (68.60%)
+  LCZ  4 : 0.7725 (77.25%)
+  LCZ  5 : 0.2949 (29.49%)
+  LCZ  6 : 0.5723 (57.23%)
+  LCZ  7 : 0.2286 (22.86%)
+  LCZ  8 : 0.8801 (88.01%)
+  LCZ  9 : 0.4143 (41.43%)
+  LCZ 10 : 0.3062 (30.62%)
+  LCZ 11 : 0.8011 (80.11%)
+  LCZ 12 : 0.2956 (29.56%)
+  LCZ 13 : 0.0789 (7.89%)
+  LCZ 14 : 0.8312 (83.12%)
+  LCZ 15 : 0.3317 (33.17%)
+  LCZ 16 : 0.5017 (50.17%)
+  LCZ 17 : 0.9811 (98.11%)
+
   Sur du urban only en nearest : 
 Résultats du test pour 120 pixels avec la méthode nearest en linear probing
 

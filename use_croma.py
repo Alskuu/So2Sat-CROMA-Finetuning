@@ -44,7 +44,6 @@ class PretrainedCROMA(nn.Module):
             self.num_heads = 16
             self.patch_size = 8
         else:
-            # large by default
             self.encoder_dim = 1024
             self.encoder_depth = 24
             self.num_heads = 16

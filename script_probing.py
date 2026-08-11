@@ -57,9 +57,9 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
         if linear:
             probe = CROMALinearProbe(
                 pretrained_path=pretrained_path,
-                modality="both",
+                modality=modality,
                 joint=True,
-                num_classes=10,
+                num_classes=17,
             ).to(device)
         else:
             probe = CROMAMLProbe(
@@ -193,9 +193,9 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
         # ── Chargement du meilleur modèle ────────────────────────────────────
         if linear:
             probe = CROMALinearProbe(pretrained_path=pretrained_path,
-                                     modality="both",
+                                     modality=modality,
                                      joint=True,
-                                     num_classes=10,).to(device)
+                                     num_classes=17,).to(device)
             if interpolation_mtd is not None:
                 probe.classifier.load_state_dict(torch.load(
                     f"best_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location=device))
@@ -271,7 +271,7 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
 if __name__ == "__main__":
     print("On commence par le train : \n")
     probing(train=True, linear=True, interpolation_mtd="nearest",
-            image_resolution=120, modality="both")
+            image_resolution=120, modality="optical")
     print("Passage au test :\n")
     probing(train=False, linear=True,
-            interpolation_mtd="nearest", image_resolution=120, modality="both")
+            interpolation_mtd="nearest", image_resolution=120, modality="optical")

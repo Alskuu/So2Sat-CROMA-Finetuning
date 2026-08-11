@@ -141,27 +141,6 @@ class CROMAFineTuning(nn.Module):
         if freeze_n_layers > 0:
             self._freeze_first_n_layers(freeze_n_layers)
 
-    def _freeze_first_n_layers(self, n: int):
-        """
-        Freezes the first n transformer layers in each tower (s1_encoder,
-        s2_encoder, cross_encoder). CROMA uses x-transformers style naming:
-        `<tower>.transformer.layers.<idx>.<0|1>...` where <0|1> distinguishes
-        attention (0) from feedforward (1) sub-blocks within the same layer idx.
-        """
-        frozen_layers = set()
-        for name, p in self.backbone.named_parameters():
-            parts = name.split(".")
-            if "layers" in parts:
-                idx_pos = parts.index("layers") + 1
-                if idx_pos < len(parts) and parts[idx_pos].isdigit():
-                    layer_idx = int(parts[idx_pos])
-                    if layer_idx < n:
-                        p.requires_grad = False
-                        frozen_layers.add(
-                            (parts[0], layer_idx))  # (tower, idx)
-        logger.info(
-            f"Froze layers < {n} across towers: {sorted(frozen_layers)}")
-
     def load_pretrained_head(self, path: str):
         """
         LP-FT initialization: loads the already-trained linear-probe weights
