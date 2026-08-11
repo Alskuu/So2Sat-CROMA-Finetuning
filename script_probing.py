@@ -271,7 +271,7 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
 if __name__ == "__main__":
     print("On commence par le train : \n")
     probing(train=True, linear=True, interpolation_mtd="nearest",
-            image_resolution=120, modality="optical")
+            image_resolution=120, modality="both")
     print("Passage au test :\n")
     probing(train=False, linear=True,
-            interpolation_mtd="nearest", image_resolution=120, modality="optical")
+            interpolation_mtd="nearest", image_resolution=120, modality="both")
