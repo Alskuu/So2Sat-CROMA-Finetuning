@@ -89,7 +89,19 @@ Résultats du test pour 120 pixels avec la méthode nearest en linear probing
 ══════════════════════════════════════════
         Résultats — Test set
 ══════════════════════════════════════════
-  Overall Accuracy (OA)  : 0.6255 (62.55%)
-  Average Accuracy (AA)  : 0.5213 (52.13%)
-  Macro F1               : 0.5412
+  Overall Accuracy (OA)  : 0.6294 (62.94%)
+  Average Accuracy (AA)  : 0.5174 (51.74%)
+  Macro F1               : 0.5413
 ══════════════════════════════════════════
+
+Accuracy par classe :
+  LCZ  1 : 0.3308 (33.08%)
+  LCZ  2 : 0.5285 (52.85%)
+  LCZ  3 : 0.7387 (73.87%)
+  LCZ  4 : 0.7118 (71.18%)
+  LCZ  5 : 0.3381 (33.81%)
+  LCZ  6 : 0.5573 (55.73%)
+  LCZ  7 : 0.1710 (17.10%)
+  LCZ  8 : 0.8927 (89.27%)
+  LCZ  9 : 0.5027 (50.27%)
+  LCZ 10 : 0.4020 (40.20%)

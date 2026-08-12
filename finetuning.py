@@ -499,8 +499,9 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
 
         with autocast(device_type="cuda", dtype=cfg.mixed_precision):
             logits = model(sar, optical)
-            adjusted_logits = logits + tau * log_prior
-            loss = loss_fn(adjusted_logits, labels)
+            # adjusted_logits = logits + tau * log_prior
+            # loss = loss_fn(adjusted_logits, labels)
+            loss = loss_fn(logits, labels)
 
         if is_fp16:
             scaler.scale(loss).backward()
