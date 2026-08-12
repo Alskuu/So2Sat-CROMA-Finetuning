@@ -71,7 +71,7 @@ class FineTuneConfig:
     head_init_path: Optional[str] = None
     epochs: int = 30
     batch_size: int = 64
-    backbone_lr: float = 5e-5
+    backbone_lr: float = 2e-5
     # As we use the LP-FT method it is better to have a smaller head_LR than when it is random..
     head_lr: float = 2e-4
     # LLRD factor, <1 => earlier layers get smaller LR : mostly 0.65 for ViT-Base and 0.75 for ViT-Large

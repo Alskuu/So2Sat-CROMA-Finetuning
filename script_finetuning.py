@@ -58,7 +58,7 @@ def build_argparser():
     p.add_argument("--min-epochs", type=int, default=15)
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch-size", type=int, default=64)
-    p.add_argument("--backbone-lr", type=float, default=5e-5)
+    p.add_argument("--backbone-lr", type=float, default=2e-5)
     p.add_argument("--head-lr", type=float, default=2e-4)
     p.add_argument("--layer-decay", type=float, default=0.65)
     p.add_argument("--weight-decay", type=float, default=0.05)
@@ -200,8 +200,8 @@ def main(urban_only: bool):
                                                       world_size, len(val_ds), is_distributed)
 
             logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
-            if aa > best_metric + cfg.early_stop_epsilon:
-                best_metric = aa
+            if oa > best_metric + cfg.early_stop_epsilon:
+                best_metric = oa
                 epochs_without_improvement = 0
                 if rank == 0:
                     save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
