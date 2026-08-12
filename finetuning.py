@@ -82,7 +82,7 @@ class FineTuneConfig:
     # 0 = full fine-tuning; >0 for partial fine-tuning ablation
     freeze_n_layers: int = 0
     mixed_precision: torch.dtype = torch.float16
-    gradient_checkpointing: bool = True
+    gradient_checkpointing: bool = False
     num_workers: int = 4
     seed: int = 42
     # contrôle si le scipt doit reprendre l'entraînement là où il

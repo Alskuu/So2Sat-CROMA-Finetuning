@@ -68,8 +68,6 @@ def build_argparser():
                  "float16": torch.float16, "float32": torch.float32}
     p.add_argument("--mixed-precision",
                    type=lambda s: DTYPE_MAP[s], default=torch.float16, choices=DTYPE_MAP.values())
-    p.add_argument("--no-gradient-checkpointing",
-                   action="store_false", dest="gradient_checkpointing")
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--no-resume", action="store_false", dest="resume")
