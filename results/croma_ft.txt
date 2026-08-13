@@ -1,11 +1,5 @@
 Résultats CROMA full finetuning : 
 
---- RÉSULTATS DU TEST ---
-Overall Accuracy (OA) : 68.54%
-Average Accuracy (AA) : 62.83%
-Macro-F1 :59.20%
-
-
 Résultats CROMA test 1 fullft: 
 
 --- RÉSULTATS DU TEST ---
@@ -18,6 +12,11 @@ Overall Accuracy (OA) : 80.54%
 Average Accuracy (AA) : 57.35%
 Macro-F1 : 52.85%
 
+--- RESULTATS -- continent=afrique, etape=1 ---
+Overall Accuracy (OA) : 45.10%
+Average Accuracy (AA) : 46.00%
+Macro-F1 : 23.58%
+
 Test 2 : 
 --- RÉSULTATS DU TEST ---
 Overall Accuracy (OA) : 69.39%
@@ -29,6 +28,11 @@ Overall Accuracy (OA) : 79.38%
 Average Accuracy (AA) : 60.59%
 Macro-F1 : 53.54%
 
+--- RESULTATS -- continent=afrique, etape=2 ---
+Overall Accuracy (OA) : 37.94%
+Average Accuracy (AA) : 37.90%
+Macro-F1 : 20.07%
+
 Test 3 : 
 --- RÉSULTATS DU TEST ---
 Overall Accuracy (OA) : 68.54%
@@ -39,6 +43,11 @@ Macro-F1 :59.20%
 Overall Accuracy (OA) : 78.45%
 Average Accuracy (AA) : 59.64%
 Macro-F1 : 52.26%
+
+--- RESULTATS -- continent=afrique, etape=3 ---
+Overall Accuracy (OA) : 38.31%
+Average Accuracy (AA) : 43.18%
+Macro-F1 : 20.23%
 
 Test 4 :
 --- RÉSULTATS DU TEST ---
