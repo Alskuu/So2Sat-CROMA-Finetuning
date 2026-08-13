@@ -49,6 +49,11 @@ Overall Accuracy (OA) : 38.31%
 Average Accuracy (AA) : 43.18%
 Macro-F1 : 20.23%
 
+--- RESULTATS -- continent=asie, etape=3 ---
+Overall Accuracy (OA) : 68.24%
+Average Accuracy (AA) : 59.94%
+Macro-F1 : 57.48%
+
 Test 4 :
 --- RÉSULTATS DU TEST ---
 Overall Accuracy (OA) : 37.57%
@@ -78,6 +83,11 @@ Macro-F1 : 47.73%
 Overall Accuracy (OA) : 55.96%
 Average Accuracy (AA) : 42.83%
 Macro-F1 : 30.19%
+
+--- RESULTATS -- continent=asie, etape=6 ---
+Overall Accuracy (OA) : 63.64%
+Average Accuracy (AA) : 54.00%
+Macro-F1 : 53.71%
 
 Test 7 :
 --- RÉSULTATS DU TEST ---
