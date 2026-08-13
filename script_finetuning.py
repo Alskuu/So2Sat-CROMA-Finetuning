@@ -198,8 +198,8 @@ def main(urban_only: bool):
                                                       world_size, len(val_ds), is_distributed)
 
             logger.info(f"Epoch {epoch} | val OA {oa:.4f} | val AA {aa:.4f}")
-            if oa > best_metric + cfg.early_stop_epsilon:
-                best_metric = oa
+            if aa > best_metric + cfg.early_stop_epsilon:
+                best_metric = aa
                 epochs_without_improvement = 0
                 if rank == 0:
                     save_confusion_matrix(all_targets, all_preds, LCZ_CLASSES, Path(
