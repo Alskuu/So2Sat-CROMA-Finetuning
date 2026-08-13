@@ -256,4 +256,4 @@ def main(urban_only: bool):
 
 
 if __name__ == "__main__":
-    main(False)
+    main(True)

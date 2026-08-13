@@ -13,3 +13,6 @@ checkpoints/config_lrs_23_07/
 testing_model.py
 use_model.py
 confusion_lp.py
+segmentation_testing.py
+figures/
+results/croma_ft.txt

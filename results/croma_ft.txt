@@ -4,3 +4,99 @@ Résultats CROMA full finetuning :
 Overall Accuracy (OA) : 68.54%
 Average Accuracy (AA) : 62.83%
 Macro-F1 :59.20%
+
+
+Résultats CROMA test 1 fullft: 
+
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 68.50%
+Average Accuracy (AA) : 56.75%
+Macro-F1 :56.62%
+
+--- RESULTATS -- continent=europe, etape=1 ---
+Overall Accuracy (OA) : 80.54%
+Average Accuracy (AA) : 57.35%
+Macro-F1 : 52.85%
+
+Test 2 : 
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 69.39%
+Average Accuracy (AA) : 60.45%
+Macro-F1 :59.64%
+
+--- RESULTATS -- continent=europe, etape=2 ---
+Overall Accuracy (OA) : 79.38%
+Average Accuracy (AA) : 60.59%
+Macro-F1 : 53.54%
+
+Test 3 : 
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 68.54%
+Average Accuracy (AA) : 62.83%
+Macro-F1 :59.20%
+
+--- RESULTATS -- continent=europe, etape=3 ---
+Overall Accuracy (OA) : 78.45%
+Average Accuracy (AA) : 59.64%
+Macro-F1 : 52.26%
+
+Test 4 :
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 37.57%
+Average Accuracy (AA) : 35.85%
+Macro-F1 :28.22%
+
+
+Test 5 : 
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 63.09%
+Average Accuracy (AA) : 61.54%
+Macro-F1 :58.39%
+
+
+Test 6 : 
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 65.70%
+Average Accuracy (AA) : 61.17%
+Macro-F1 :60.20%
+
+--- RESULTATS -- continent=europe, etape=6 ---
+Overall Accuracy (OA) : 68.35%
+Average Accuracy (AA) : 52.19%
+Macro-F1 : 47.73%
+
+--- RESULTATS -- continent=afrique, etape=6 ---
+Overall Accuracy (OA) : 55.96%
+Average Accuracy (AA) : 42.83%
+Macro-F1 : 30.19%
+
+Test 7 :
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 69.56%
+Average Accuracy (AA) : 60.53%
+Macro-F1 :58.43%
+
+--- RESULTATS -- continent=europe, etape=7 ---
+Overall Accuracy (OA) : 77.19%
+Average Accuracy (AA) : 55.88%
+Macro-F1 : 48.96%
+
+--- RESULTATS -- continent=afrique, etape=7 ---
+Overall Accuracy (OA) : 41.58%
+Average Accuracy (AA) : 42.96%
+
+Test 8 : 
+--- RÉSULTATS DU TEST ---
+Overall Accuracy (OA) : 69.39%
+Average Accuracy (AA) : 58.60%
+Macro-F1 :58.49%
+
+--- RESULTATS -- continent=europe, etape=8 ---
+Overall Accuracy (OA) : 80.19%
+Average Accuracy (AA) : 57.04%
+Macro-F1 : 52.92%
+
+--- RESULTATS -- continent=afrique, etape=8 ---
+Overall Accuracy (OA) : 42.90%
+Average Accuracy (AA) : 44.29%
+Macro-F1 : 24.07%
