@@ -4,23 +4,21 @@ import torch
 from typing import Optional
 import time
 
-from optimisation import extract_features_from_loader
+from cache_to_disk import extract_features_from_loader
 
 
-def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int, modality: str, force_recompute: bool = False):
+def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int, modality: str, urban_only: bool, force_recompute: bool = False):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     TARGET_SIZE = image_resolution
     if train:
         train_dataset = So2SatDataset(h5_path="D:/LCZ42/training.h5", image_resolution=TARGET_SIZE,
-                                      urban_only=True,
-                                      selected_classes=None,
+                                      urban_only=urban_only,
                                       remap_labels=False,
                                       interpolation_mtd=interpolation_mtd
                                       )
 
         val_dataset = So2SatDataset(h5_path="D:/LCZ42/validation.h5", image_resolution=TARGET_SIZE,
-                                    urban_only=True,
-                                    selected_classes=None,
+                                    urban_only=urban_only,
                                     remap_labels=False,
                                     interpolation_mtd=interpolation_mtd
                                     )
@@ -41,6 +39,7 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
             method=interpolation_mtd,
             image_resolution=image_resolution,
             modality=modality,
+            urban_only=urban_only,
             feature_type="GAP",
             cache_dir="cache/",
             cache_name="train",
@@ -54,6 +53,7 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
             method=interpolation_mtd,
             image_resolution=image_resolution,
             modality=modality,
+            urban_only=urban_only,
             feature_type="GAP",
             cache_dir="cache/",
             cache_name="val",
@@ -63,8 +63,7 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
         print("Extraction terminée, features sauvegardées dans cache/")
     else:
         test_dataset = So2SatDataset(h5_path="D:/LCZ42/testing.h5", image_resolution=TARGET_SIZE,
-                                     urban_only=True,
-                                     selected_classes=None,
+                                     urban_only=urban_only,
                                      remap_labels=False,
                                      interpolation_mtd=interpolation_mtd
                                      )
@@ -80,6 +79,7 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
             image_resolution=image_resolution,
             method=interpolation_mtd,
             modality=modality,
+            urban_only=urban_only,
             feature_type="GAP",
             cache_dir="cache/",
             cache_name="test",
@@ -93,13 +93,13 @@ def script(train: bool, interpolation_mtd: Optional[str], image_resolution: int,
 if __name__ == "__main__":
     start_time = time.time()
     script(False, "nearest", image_resolution=120,
-           modality="both", force_recompute=True)
+           modality="both", urban_only=True, force_recompute=True)
     script(True, "nearest", image_resolution=120,
-           modality="both", force_recompute=True)
+           modality="both", urban_only=True, force_recompute=True)
     # script(True, "bilinear", image_resolution=120,
-    #       modality="both", force_recompute=True)
+    #       modality="both", urban_only=True, force_recompute=True)
     # script(False, "bilinear", image_resolution=120,
-    #       modality="both", force_recompute=True)
+    #       modality="both", urban_only=True, force_recompute=True)
     end_time = time.time() - start_time
     print(
         f"Temps pour faire tourner tous les scripts en minutes : {end_time/60}")

@@ -499,9 +499,10 @@ def train_one_epoch(model, loader, optimizer, scaler, device, cfg, global_step, 
 
         with autocast(device_type="cuda", dtype=cfg.mixed_precision):
             logits = model(sar, optical)
-            # adjusted_logits = logits + tau * log_prior
-            # loss = loss_fn(adjusted_logits, labels)
-            loss = loss_fn(logits, labels)
+            adjusted_logits = logits + tau * log_prior
+            loss = loss_fn(adjusted_logits, labels)
+            # Cas sans logit adjustment :
+            # loss = loss_fn(logits, labels)
 
         if is_fp16:
             scaler.scale(loss).backward()
@@ -633,7 +634,8 @@ def save_confusion_matrix(
     y_pred: np.ndarray,
     class_names: list,
     save_path: str,
-    normalize: bool = True
+    normalize: bool = True,
+    bonus_str: str = ""
 ):
     """
     Shows a normalized (or not) confusion matrix
@@ -643,10 +645,10 @@ def save_confusion_matrix(
     if normalize:
         cm = cm.astype('float') / (cm.sum(axis=1, keepdims=True) + 1e-8)
         fmt = '.2f'
-        title = 'Matrice de Confusion Normalisée (%)'
+        title = f"Matrice de Confusion Normalisée (%) {bonus_str}"
     else:
         fmt = 'd'
-        title = 'Matrice de Confusion (Comptes Bruts)'
+        title = f"Matrice de Confusion (Comptes Bruts) {bonus_str}"
 
     plt.figure(figsize=(12, 10))
     sns.heatmap(

@@ -25,6 +25,7 @@ from finetuning import (
     PreemptionFlag,
 )
 from sampler import SequentialDistributedSampler
+from utils.naming_utils import build_probe_checkpoint_name
 
 
 logging.basicConfig(level=logging.INFO,
@@ -71,15 +72,31 @@ def build_argparser():
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--no-resume", action="store_false", dest="resume")
+    p.add_argument("--head-init-path", type=str, default=None)
+    p.add_argument("--gradient-checkpointing", action="store_true")
+    p.add_argument("--eval-every", type=int, default=1)
+    p.add_argument("--log-every", type=int, default=300)
+    p.add_argument("--logit-adj-tau", type=float, default=1.0)
+    # Si activé, entraîne/évalue uniquement sur les 10 classes LCZ urbaines
+    # au lieu des 17 classes complètes
+    p.add_argument("--urban-only", action="store_true")
     return p
 
 
-def main(urban_only: bool):
+def main():
     args = build_argparser().parse_args()
+    urban_only = args.urban_only
 
-    cfg = FineTuneConfig(**vars(args))
+    cfg_kwargs = vars(args).copy()
+    cfg_kwargs.pop("urban_only")
+    cfg = FineTuneConfig(**cfg_kwargs)
     if cfg.head_init_path is None:
-        cfg.head_init_path = f"{cfg.checkpoint_dir}/best_linear_probe_both_{cfg.interpolation_mtd}_{cfg.image_resolution}.pt"
+        # Même convention de nommage que script_probing.py::build_probe_checkpoint_name,
+        # pour ne jamais recharger par erreur une tête de probing entraînée sur
+        # l'autre mode (urban_only vs 17 classes completes).
+        head_ckpt_name = build_probe_checkpoint_name(
+            "best_linear_probe", "both", cfg.interpolation_mtd, cfg.image_resolution, urban_only)
+        cfg.head_init_path = f"{cfg.checkpoint_dir}/{head_ckpt_name}"
 
     torch.manual_seed(cfg.seed)
     Path(cfg.checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -256,4 +273,4 @@ def main(urban_only: bool):
 
 
 if __name__ == "__main__":
-    main(True)
+    main()

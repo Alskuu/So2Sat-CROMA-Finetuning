@@ -1,0 +1,538 @@
+========================================================================
+REVIEW DE CODE — Repository IRD (stage LCZ42 / CROMA)
+Revue exhaustive de tous les fichiers .py et .ipynb
+========================================================================
+
+Ce fichier décrit, pour CHAQUE fichier Python et notebook du projet, son rôle,
+ses responsabilités et ses dépendances (internes au projet + librairies).
+
+Contexte général : le projet vise à adapter le modèle fondation CROMA
+(encodeur Sentinel-1/Sentinel-2) à la classification LCZ42 (Local 
+Climate Zones, dataset So2Sat), via probing (linéaire/MLP) puis 
+fine-tuning complet, avec évaluation géographique (par continent) et 
+export cartographique (GeoTIFF/GPKG/QGIS).
+
+
+------------------------------------------------------------------------
+1. cromacode/ — pipeline CROMA -> LCZ42 (module principal)
+------------------------------------------------------------------------
+
+cromacode/dataset.py
+  Rôle : définit `So2SatDataset`, la classe PyTorch `Dataset` canonique
+  utilisée par tous les scripts d'entraînement/évaluation récents
+  (script_finetuning.py, script_uno.py, testing_model*.py, confusion_lp.py,
+  lr_range_test.py). Charge un split So2Sat (.h5) et retourne des triplets
+  (sar, optical, label).
+  Responsabilités : ouverture paresseuse du fichier HDF5 par worker
+  (`_lazy_open`, un fichier ouvert par processus DataLoader) ; filtrage
+  optionnel aux 10 classes urbaines (`urban_only`) ; construction du tenseur
+  SAR (2 canaux, bandes 5/6 de Sentinel-1, converties en dB via
+  `10*log10`) ; construction du tenseur optique 12 canaux au format attendu
+  par CROMA (bandes B1 et B9 absentes de So2Sat -> remplies de zéros) ;
+  interpolation optionnelle (`nearest`/`bilinear`) vers la résolution native
+  CROMA (120px) ; normalisation z-score par canal après interpolation.
+  Dépendances : torch, h5py, numpy. Aucun import interne.
+
+cromacode/use_croma.py
+  Rôle : portage/implémentation du modèle CROMA pré-entraîné pour
+  l'inférence (chargement de poids convertis, forward simplifié sans
+  masquage MAE). Classe centrale `PretrainedCROMA` : instancie les encodeurs
+  ViT SAR (`s1_encoder`) et/ou optique (`s2_encoder`) selon la modalité
+  demandée, plus l'encodeur cross-attention joint (`cross_encoder`) si
+  `modality='both'`, charge les poids depuis un checkpoint `.pt` unique
+  contenant des sous-dictionnaires par composant.
+  `ViT` : patchification 8x8 + projection linéaire + transformeur. Le
+  `forward()` retourne un dict avec les clés GAP et encodings par modalité
+  (SAR_GAP, optical_GAP, joint_GAP, etc.).
+  C'est le module central importé par presque tous les autres fichiers du
+  dossier (probes.py, use_model.py, finetuning.py, cache_to_disk.py, et les
+  notebooks).
+  Dépendances : torch, einops. Aucun import interne.
+
+
+
+cromacode/utils/naming_utils.py
+  Rôle : source unique de vérité pour les noms de fichiers dérivés du choix
+  urban_only (10 classes LCZ urbaines vs 17 classes complètes), afin que
+  cache_to_disk.py, script_uno.py, script_probing.py et script_finetuning.py
+  ne puissent pas silencieusement mélanger un cache de features ou une tête
+  de probing entraînée en urban_only avec le mode 17 classes.
+  Responsabilités : `num_classes_for(urban_only)` -> 10 ou 17 ;
+  `urban_only_tag(urban_only)` -> suffixe `"urban10"`/`"full17"` inclus dans
+  tout nom de cache/checkpoint ; `build_probe_checkpoint_name`/
+  `build_probe_checkpoint_path`, nom de fichier standard pour les poids de
+  tête de probing (linéaire ou MLP), utilisé à la fois par script_probing.py
+  (écriture) et script_finetuning.py (lecture via head_init_path) pour
+  garantir qu'ils désignent toujours le même fichier.
+  Dépendances : aucune (module pur, pas de dépendance torch/CROMA) — conçu
+  pour être importable sans effet de bord depuis n'importe quel script.
+
+cromacode/utils/geo_utils.py
+  Rôle : toutes les fonctions utiles pour la conversion des coordonnées
+  géographiques du dataset So2Sat (UTM + EPSG par point -> lon/lat) et la
+  construction du GeoDataFrame de points qui en résulte, factorisée 
+  à partir du code dupliqué à l'identique dans
+  segmentation_set.py et geolocations.ipynb.
+  Responsabilités : `epsg327_false_northing_fix` — correction du bug UTM
+  "false northing" (EPSG 327xx, hémisphère sud, y < 0) ; `to_lonlat` —
+  conversion x/y projetés vers lon/lat via `pyproj.Transformer`, un CRS par
+  EPSG rencontré dans le batch ; `points_gdf_from_lonlat` — construction
+  d'un GeoDataFrame EPSG:4326 (colonne idx + colonnes optionnelles) ;
+  constante `COUNTRIES_SHP` (chemin du shapefile Natural Earth), partagée
+  elle aussi entre segmentation_set.py et geolocations.ipynb.
+  Note : save_geotiff.py ne réutilise PAS ce module — il travaille
+  directement sur le GeoTransform (Affine) de chaque patch plutôt que sur
+  des coordonnées ponctuelles x/y + EPSG, donc rien de commun à factoriser
+  avec ce fichier.
+  Dépendances : numpy, geopandas, pyproj. Aucun import interne.
+
+cromacode/cache_to_disk.py
+  Rôle : extraction de features CROMA "figées" (backbone gelé) à partir d'un
+  DataLoader, avec mise en cache disque — utilisé pour le linear/MLP
+  probing (script_uno.py extrait, script_probing.py entraîne sur les
+  features en cache). C'est une version optimisée
+  d'une fonction équivalente présente initialement dans le notebook
+  UntitledCroma.ipynb/geolocations.ipynb.
+  Responsabilités : `build_cache_path` qui a un nom de fichier cache déterministe
+  basé sur modality/method/image_resolution/urban_only  le paramètre `urban_only` 
+  est obligatoire et intégré au nom de fichier via naming_utils.urban_only_tag ;
+  `extract_features_from_loader` a une boucle d'inférence en `torch.no_grad()`
+  et `autocast(bfloat16)`, avec pré-allocation d'un tenseur de sortie
+  (`torch.empty` en pinned memory) ;
+  réutilisation du cache existant si présent (`force_recompute=False`) ;
+  reçoit `urban_only` en paramètre obligatoire, propagé à
+  `build_cache_path` et enregistré dans les métadonnées du cache.
+  Dépendances internes : cromacode/use_croma.py (`PretrainedCROMA`),
+  cromacode/utils/naming_utils.py (`urban_only_tag`).
+  Dépendances externes : torch, tqdm.
+
+cromacode/script_uno.py
+  Rôle : script d'extraction de features (train/val/test) via
+  `cache_to_disk.extract_features_from_loader`, en amont de
+  script_probing.py — construit les DataLoaders So2Sat puis lance
+  l'extraction avec mise en cache sur disque (`cache/`).
+  `script()` prend `urban_only: bool` en
+  paramètre explicite (train/val ET test) au lieu de le coder en dur à
+  `True` indépendamment sur chacun des trois datasets qui est ensuite propagé à
+  `So2SatDataset` et à `extract_features_from_loader`. Corrige au passage
+  une virgule manquante après `urban_only=True` dans la construction de
+  `val_dataset`.
+  Dépendances internes : cromacode/dataset.py (`So2SatDataset`),
+  cromacode/cache_to_disk.py.
+
+
+cromacode/probes.py
+  Rôle : définit deux têtes de "probing" (sondage) au-dessus de l'encodeur
+  CROMA gelé, entraînées séparément du backbone :
+  - `CROMALinearProbe` : une seule couche linéaire.
+  - `CROMAMLProbe` : petit MLP (Linear -> LayerNorm -> GELU -> Dropout ->
+    Linear).
+  Les deux gèlent les paramètres de `PretrainedCROMA` (requires_grad=False)
+  et adaptent la dimension d'entrée selon la modalité (both=1536 si
+  concaténation SAR+optical, 768 si `joint` ou modalité unique). Leur
+  `forward()` prend directement des features déjà extraites (et non des
+  images), pensé pour être utilisé avec des features mises en cache par
+  cache_to_disk.py.
+  Dépendances internes : cromacode/use_croma.py (`PretrainedCROMA`),
+  cromacode/dataset.py (`TARGET_SIZE`).
+
+cromacode/script_probing.py
+  Rôle : point d'entrée du linear/MLP probing — entraîne
+  `CROMALinearProbe`/`CROMAMLProbe` (probes.py) sur des features déjà
+  extraites et mises en cache par cache_to_disk.py/script_uno.py (pas de
+  passage dans le backbone CROMA pendant cette boucle, juste sur les
+  vecteurs (N, 768) chargés en RAM).
+  Responsabilités : fonction unique `probing(train, linear, ..., urban_only)`
+  qui gère à la fois l'entraînement (boucle avec early stopping sur
+  l'Average Accuracy, sauvegarde du meilleur état) et le test (chargement du
+  meilleur modèle, calcul OA/AA/macro-F1, accuracy par classe) selon le flag
+  `train`.
+  Les chemins de cache (train/val/test) sont construits via `cache_to_disk.build_cache_path`
+  et les noms de fichiers de poids de tête via `naming_utils.build_probe_checkpoint_name` 
+  les deux incluent le tag urban_only ("urban10"/"full17"). `num_classes`
+  est calculé via `naming_utils.num_classes_for(urban_only)` au lieu d'être
+  codé en dur à 10 pour `CROMALinearProbe` ; `CROMAMLProbe` reçoit
+  explicitement ce `num_classes`
+  Dépendances internes : cromacode/probes.py, cromacode/cache_to_disk.py
+  (`build_cache_path`), cromacode/utils/naming_utils.py.
+
+cromacode/sampler.py
+  Rôle : implémente `SequentialDistributedSampler`, un sampler PyTorch pour
+  l'évaluation distribuée (DDP/SLURM) qui garantit un découpage contigu et
+  sans mélange des indices entre GPUs, avec padding uniquement en fin de
+  séquence — condition nécessaire pour pouvoir tronquer proprement après
+  `all_gather` et retrouver exactement les échantillons uniques du split de
+  validation/test (utilisé par script_finetuning.py via `evaluate()`).
+  cf. le commentaire en dessous de la classe dans sampler.py pour plus 
+  d'informations.
+  Dépendances : torch, math. Aucun import interne.
+
+cromacode/finetuning.py
+  Rôle : cœur du pipeline de fine-tuning complet (pas juste le probing) du
+  backbone CROMA sur LCZ42, conçu pour tourner aussi bien en local
+  (mono-GPU) que sur un cluster SLURM type Jean Zay (multi-GPU DDP,
+  checkpoint/resume sur SIGTERM). Ce module ne contient QUE les briques
+  réutilisables (config, modèle, optimizer, boucles train/eval,
+  checkpointing), c'est le point d'entrée exécutable est script_finetuning.py.
+  Responsabilités principales :
+  - `FineTuneConfig` (dataclass) : tous les hyperparamètres (LR tête vs
+    backbone, layer-wise LR decay, warmup, patience, etc.).
+  - `CROMAFineTuning` : wrapper backbone (dégelé, contrairement aux probes)
+    + tête linéaire, avec gradient checkpointing optionnel et
+    `load_pretrained_head` pour l'initialisation LP-FT (Kumar et al. 2022 —
+    partir des poids du linear probe plutôt que d'une tête aléatoire).
+  - `build_llrd_param_groups`/`build_optimizer` : Layer-wise Learning Rate
+    Decay — groupe les paramètres par "tour" (s1_encoder/s2_encoder) et
+    profondeur relative, applique `layer_decay^(depth_max-depth)` sur le LR,
+    distingue les paramètres avec/sans weight decay (1D, biais, norm ->
+    sans decay).
+  - `setup_hardware_and_distributed` : détection SLURM/DDP + logs matériel.
+  - `PreemptionFlag` : gestion du SIGTERM envoyé par SLURM avant
+    préemption, avec synchronisation multi-GPU (`all_reduce`) pour que tous
+    les rangs s'arrêtent proprement ensemble.
+  - `save_checkpoint`/`load_checkpoint` : sérialisation modèle + optimizer +
+    scaler + métriques + compteur de patience.
+  - `train_one_epoch`/`evaluate` : boucles d'entraînement (mixed precision
+    FP16/BF16, cosine warmup LR schedule, gradient clipping) et
+    d'évaluation distribuée (Overall Accuracy + Average Accuracy par
+    classe, agrégation `all_gather_into_tensor` entre GPUs).
+  - `save_confusion_matrix` : heatmap seaborn normalisée ou brute.
+  Dépendances internes : cromacode/use_croma.py (`PretrainedCROMA`).
+  Dépendances externes : torch, seaborn, matplotlib, pandas, scikit-learn.
+
+
+cromacode/script_finetuning.py
+  Rôle : point d'entrée CLI (`argparse`) du fine-tuning complet — construit
+  `FineTuneConfig` depuis les arguments, instancie modèle/optimizer/loaders,
+  gère la boucle d'epochs avec resume/early-stopping/checkpointing, puis
+  lance `finetuning.train_one_epoch`/`evaluate` à chaque epoch.
+  Responsabilités spécifiques à ce fichier (au-delà de l'appel aux fonctions
+  de finetuning.py) : construction des DataLoaders (`DistributedSampler`
+  pour l'entraînement, `SequentialDistributedSampler` pour la validation en
+  mode distribué) ; chargement de la tête pré-entraînée
+  (`head_init_path`, dérivé automatiquement du répertoire de checkpoint
+  quand non fourni) ; boucle principale epoch par epoch avec sauvegarde de
+  la matrice de confusion à chaque nouvelle meilleure AA ; sortie propre en
+  cas de préemption SLURM (`sys.exit(99)` pour signaler au script sbatch de
+  requeue) ; comptage en dur des occurrences par classe LCZ
+  (`train_counts`) pour un ajustement logit.
+  Dépendances internes : cromacode/dataset.py, cromacode/finetuning.py,
+  cromacode/sampler.py, cromacode/utils/naming_utils.py.
+
+cromacode/use_model.py
+  Rôle : définit `CROMAClassifier`, le wrapper final utilisé pour
+  l'évaluation après fine-tuning ou linear probing. Recharge un
+  backbone CROMA + une tête (`head`) sauvegardés séparément (fichiers .pt
+  distincts) et les recombine pour l'inférence.
+  Responsabilités : reconstruction de la tête comme `nn.Sequential(Dropout,
+  Linear)` ; gestion spéciale du cas `lp=True`(linear probe) où le checkpoint de tête vient
+  d'un `nn.Linear` brut (linear probing) et non du `Sequential` attendu par
+  le fine-tuning — remapping des clés `weight`/`bias` -> `1.weight`/`1.bias`.
+  Chemin du backbone CROMA de base codé en dur (`D:/CROMA_weights/CROMA_base.pt`).
+  Utilisé par confusion_lp.py, testing_model.py, test_model_create_gpkg_kml.py.py.
+  Dépendances internes : cromacode/use_croma.py (`PretrainedCROMA`).
+
+
+cromacode/segmentation_set.py (doc. déjà existante dans une version
+précédente de ce fichier, vérifiée et enrichie ici)
+  Rôle : script de segmentation géographique du dataset LCZ42 par
+  continent (documenté en tête de fichier comme "02_split_by_continent.py").
+  Lit un split (.h5 image + .h5 géo associé), calcule la position lon/lat
+  de chaque patch, effectue une jointure spatiale avec les polygones pays
+  Natural Earth pour déterminer le continent (Asie subdivisée "Est"/"Ouest"
+  via une liste de pays codée en dur `WEST_ASIA_COUNTRIES`), puis réécrit un
+  couple de fichiers .h5 (image + géo) par continent, alignés ligne à ligne.
+  Responsabilités : correction du bug UTM "false northing" pour les EPSG
+  327xx (hémisphère sud) ; fallback "région la plus proche" (via
+  `sjoin_nearest` en CRS métrique EPSG:6933) pour les points sans jointure
+  exacte (essentiellement les patchs côtiers/eau non couverts par un
+  polygone pays) ; écriture d'un `orig_idx` dans chaque fichier de sortie
+  pour pouvoir retrouver la ligne d'origine dans le fichier global.
+  Documentation en tête de fichier très complète sur les choix et
+  limitations (corrections de villes NON appliquées ici, à vérifier avant
+  réplication).
+  Dépendances : h5py, numpy, pandas, geopandas. 
+  Dépendance interne : cromacode/utils/geo_utils.py
+  (`epsg327_false_northing_fix`, `to_lonlat`, `points_gdf_from_lonlat`,
+  `COUNTRIES_SHP`).
+
+cromacode/confusion_lp.py
+  Rôle : script d'évaluation CLI (`argparse`) pour un modèle linear-probing
+  donné. On charge `CROMAClassifier` avec un backbone gelé + tête de linear
+  probing, effectue l'inférence sur un split So2Sat au choix et affiche une
+  matrice de confusion.
+  Le script est générique sur le split
+  (`--split {train,validation,test}`) et déduit les noms de classe attendus
+  via `naming_utils.num_classes_for(urban_only)` 
+  Responsabilités : `evaluate_and_get_predictions` — inférence accélérée
+  Tensor Cores (`torch.autocast(bfloat16)`), paramétrée par `class_names`
+  plutôt que par la liste globale, + impression de la distribution des
+  prédictions vs. labels réels par classe ; `class_names_for(urban_only)` —
+  tronque la liste des 17 classes LCZ aux 10 classes urbaines si besoin ;
+   `build_argparser`/`main` — CLI complète (split, data-dir, modality, head-path,
+  interpolation, urban-only, etc.)
+  Dépendances internes : cromacode/dataset.py, cromacode/use_model.py,
+  cromacode/utils/naming_utils.py (`num_classes_for`).
+
+cromacode/testing_model.py
+  Rôle : module central d'évaluation du modèle fine-tuné, à la fois
+  utilisable comme script autonome (boucle systématique sur tous les
+  continents de `CONTINENT_TO_H5`, plusieurs "étapes" `k` d'ablation) et
+  comme bibliothèque partagée test_model_create_gpkg_kml.py.py, qui importe directement
+  le chargement de modèle/dataset  de ce fichier et sa boucle de test.
+  Responsabilités : `export_backbone_head` qui sépare un checkpoint complet
+  (`backbone.*`/`head.*`) en deux fichiers .pt distincts pour
+  `CROMAClassifier` ; `build_test_loader` qui construit le DataLoader
+  (urban_only selon `URBAN_ONLY_STEPS = {4}`); `test()` qui boucle d'inférence + calcul
+  métriques (OA/AA/macro-F1) + capture d'un exemple correct/faux par classe
+  vraie (idx seul) ;
+  Dépendances internes : cromacode/use_model.py, cromacode/finetuning.py
+  (`save_confusion_matrix`), cromacode/dataset.py,
+  cromacode/utils/naming_utils.py (`num_classes_for`).
+
+
+cromacode/test_model_create_gpkg_kml.py.py 
+  Rôle : callback `on_examples` branché sur `testing_model.run_one` qui pour
+  chaque exemple correct/faux d'une évaluation continent par continent,
+  écrit un GeoTIFF Sentinel-2 géoréférencé puis, à partir de la même
+  emprise reprojetée (`_build_examples_gdf`), un GPKG (QGIS) et un KML
+  (Google Earth Pro), colorés par classe LCZ vraie
+  et contour vert/rouge selon la prédiction pour le KML. Aucun CSV
+  intermédiaire : les deux fichiers ne référencent que des GeoTIFF
+  réellement écrits.
+  Ne duplique pas testing_model.py (import
+  direct de `run_loop`/`parse_args`/`LCZ_CLASSES_17`/`URBAN_ONLY_STEPS`,
+  cf. entrée testing_model.py) ; ne garde en propre que
+  le géoréférencement (`geotransform_to_affine`, `check_transform_sane`,
+  `write_geotiff_for_example`) et l'export GPKG/KML
+  (`build_examples_gpkg`/`build_examples_kml`/`write_lcz_qml_style`).
+  Etapes : 
+  1. test_model_create_gpkg_kml.py::main(k) appelle testing_model.run_loop(k, GEO_CONTINENTS, ..., on_examples=save_examples_geotiff)
+  , qui boucle sur les 7 continents et appelle run_one pour chacun.
+  2. testing_model.py::test() parcourt le DataLoader du continent (séquentiel, shuffle=False) 
+  et remplit un dict {classe_vraie: {"correct": idx, "wrong": (idx, pred_c)}} 
+   un seul exemple correct et un seul exemple faux par classe LCZ, capturé au premier passage rencontré.
+  3. run_one transmet ce dict à save_examples_geotiff (le hook), qui pour chaque classe 
+  et chaque kind ("correct"/"wrong") appelle write_geotiff_for_example : résolution de 
+  la vraie ligne du .h5 continent (via resolve_real_row, qui gère bien la translation d'index pour 
+  les étapes urban_only), lecture du patch Sentinel-2 correspondant, écriture d'un vrai .tif géoréférencé.
+  4. Seuls les GeoTIFF réellement écrits avec succès alimentent ensuite le GPKG + KML 
+  (_build_examples_gdf → build_examples_gpkg/build_examples_kml).
+  Limite à noter : `GEO_CONTINENTS` exclut "global" mais il est assez simple 
+  de l'ajouter, si on ne veut qu'un exemple pour chaque LCZ dans notre cas..
+  Dépendances internes : cromacode/testing_model.py, cromacode/dataset.py.
+  Dépendance optionnelle à geopandas/shapely (désactive l'export GPKG/KML
+  si absent).
+
+
+------------------------------------------------------------------------
+3. Visualisation des données avec des notebooks dans cromacode/notebook/
+------------------------------------------------------------------------
+cromacode/data_viz/save_geotiff.py
+  Rôle : script qui exporte, pour un sous-ensemble de villes du training set So2Sat, 
+  quelques patchs Sentinel-1 et Sentinel-2 en GeoTIFF géoréférencés (jusqu'à
+  `max_export_per_city`), pour vérification visuelle QGIS de la
+  cohérence de la géolocalisation.
+  On a un dictionnaire ville -> code EPSG (`city_epsg`, deux jeux
+  possibles training/val-test) ; conversion du vecteur "tfw" (en réalité un
+  GeoTransform GDAL, pas un vrai TFW ESRI : précisé en commentaire) en objet
+  `Affine` ; vérification de cohérence de la transformation
+  (`check_transform_sane`, tolérance 5% sur la taille de pixel attendue
+  10m) ; écriture GeoTIFF compressée DEFLATE pour sen1 et sen2 par patch.
+  Dépendances : h5py, numpy, rasterio, affine. Lit
+  `D:/LCZ42/training.h5` + `training_geo.h5`. Aucune dépendance interne au
+  projet.
+
+cromacode/data_viz/city_lcz_distribution.py
+  Rôle : pour une ville donnée (nom en langage naturel, ex. "Rio de
+  Janeiro"), récupère son code EPSG dans `CITY_EPSG` (repris tel quel du
+  dictionnaire `city_epsg` de save_geotiff.py), puis affiche la répartition exacte des 17
+  classes LCZ pour cette ville dans les splits globaux So2Sat (training/
+  validation/testing.h5 + leur `_geo.h5` associé) : comptes et pourcentages,
+  par split puis cumulés.
+  Si la ville n'est pas dans `CITY_EPSG`, `get_city_epsg` lève une
+  `ValueError` explicite plutôt que de deviner.
+  À exécuter en premier lieu pour Rio de Janeiro (EPSG 32723, présente dans
+  le training set) : c'est la valeur par défaut de `--city`.
+  Désambiguïsation géographique des villes qui partagent un même
+  EPSG (même fuseau UTM — 11 groupes sur ~50 villes de `CITY_EPSG`, ex. 6
+  villes chinoises en EPSG:32650, Rio de Janeiro + São Paulo en EPSG:32723) :
+  filtrer par EPSG seul mélangeait silencieusement les patchs de plusieurs
+  villes. Chaque patch du groupe EPSG est alors reprojeté en lon/lat via
+  `coord`+`epsg` (`utils/geo_utils.py::epsg327_false_northing_fix`/
+  `to_lonlat`, même logique que segmentation_set.py) puis assigné, via `classify_nearest_city`
+  (via la distance haversine), au centre-ville connu le plus proche parmi
+  `CITY_CENTERS`, ce sont des coordonnées approximatives, sourcées manuellement,
+  fiables car les villes candidates sont toujours séparées de centaines de
+  km (patchs de 320 m). Si le centre d'une ville candidate est absent de
+  `CITY_CENTERS`, retombe explicitement sur l'ancien comportement (titre
+  "ville(s) indiscernables", avertissement `[ATTENTION]`) plutôt que de
+  deviner. `load_coord_xy` lève une `KeyError` listant les clés disponibles
+  si `coord` est absent du `_geo.h5` (même logique défensive que
+  `get_city_epsg`, pour ne pas répéter l'erreur de supposer un champ
+  inexistant).
+  Responsabilités : `normalize_city`/`get_city_epsg`/`cities_sharing_epsg` —
+  résolution et garde-fous sur le nom de ville ; `haversine_km`/
+  `classify_nearest_city` qui désambiguïse de manière géographiquement vectorisée ;
+  `load_coord_xy` qui fait une lecture du champ `coord` ;
+  `epsg_distribution_for_split` qui filtre par EPSG (et par ville si
+  `candidates` est fourni) puis convertit les labels one-hot en comptes par
+  classe LCZ (`np.bincount`) ; `print_distribution` qui print une version tabulée
+  compte/%.
+  Générique : fonctionne pour n'importe quelle ville présente dans
+  `CITY_EPSG` sans modification du script, via `--city` (désambiguïsation
+  automatique si un `CITY_CENTERS` existe pour les villes en collision).
+  Dépendances : h5py, numpy. Dépendance interne : `utils/geo_utils.py`
+  (`epsg327_false_northing_fix`, `to_lonlat`) via un `sys.path.insert` vers
+  cromacode/ en tête de fichier (nécessaire car ce script vit dans
+  data_viz/, un sous-dossier de cromacode/ et suit le même pattern que
+  geolocations.ipynb).
+
+
+cromacode/notebooks/read_data.ipynb
+  Rôle : notebook d'exploration/débogage initial des fichiers .h5 So2Sat —
+  vérifie visuellement la cohérence des données brutes (Sentinel-1,
+  Sentinel-2) et de leur géoréférencement, avant la mise en place du
+  pipeline de segmentation par continent.
+  Structure : chargement d'un échantillon de sen1/sen2/label ; affichage
+  RGB (Sentinel-2) et fausse couleur (Sentinel-1, bandes 5/6) côte à côte ;
+  investigation du format "tfw" du fichier géo auxiliaire (découverte
+  qu'il s'agit en réalité d'un GeoTransform GDAL et non d'un vrai world
+  file ESRI — point de départ de la logique reprise dans save_geotiff.py,
+  segmentation_set.py, test_model_create_gpkg_kml.py.py) ;
+  `find_most_heterogeneous_water_examples` — recherche des patchs LCZ G
+  (eau) avec la plus forte variance sur une bande donnée (pour repérer les
+  patchs mal classés/mal géolocalisés) ; `write_geotiff_for_testing` —
+  premier prototype d'export GeoTIFF individuel avec vérification visuelle
+  intégrée (version préliminaire de la logique reprise et durcie dans
+  test_model_create_gpkg_kml.py.py) ; boucle finale d'export GeoTIFF
+  sen1/sen2 avec visualisation rasterio par bande.
+  Dépendances : h5py, numpy, rasterio, matplotlib, affine.
+  Lit `D:/LCZ42/validation.h5` + `validation_geo.h5`, écrit dans
+  `D:/LCZ42/tif_saved/` et `D:/LCZ42/forest_examples/`.
+
+cromacode/notebooks/geolocations.ipynb
+  Rôle : notebook de correction et de validation du géoréférencement des
+  patchs So2Sat, puis d'analyse croisée LCZ x géographie (pays/continent,
+  climat de Köppen). Contient la logique de référence, ensuite reprise en
+  scripts (segmentation_set.py).
+  Structure :
+  1. Pipeline de correction validé : fix du "false northing" UTM (EPSG
+     327xx), corrections manuelles ponctuelles par ville (Londres, Nanjing,
+     Hong Kong, Shenzhen — offsets EPSG +/-1, listes d'index fournies par
+     des sélections QGIS en CSV) ; cluster Cuba explicitement PAS corrigé
+     (erreur connue du dataset d'origine) ; export d'un GeoPackage de
+     points avec lon/lat corrigées.
+  2. Jointure spatiale points <-> polygones pays (Natural Earth
+     `ne_10m_admin_0_countries.shp`) pour calculer la répartition des
+     tuiles par continent/pays et par classe LCZ (comptes + pourcentages).
+  3. Croisement avec une classification climatique mondiale (raster
+     Köppen-Geiger 1991-2020) échantillonné aux positions des points
+     (`rasterio.vrt.WarpedVRT`), pour étudier la distribution LCZ par zone
+     climatique.
+  Dépendances : h5py, numpy, geopandas, pandas, rasterio. Dépendance
+  interne : cromacode/utils/geo_utils.py
+  (`epsg327_false_northing_fix`, `to_lonlat`, `points_gdf_from_lonlat`,
+  `COUNTRIES_SHP`, via un `sys.path.insert` vers cromacode/ en tête de
+  notebook) — remplace le code dupliqué avec segmentation_set.py.
+
+cromacode/notebooks/etude_globale_dataset.ipynb
+  Rôle : notebook d'analyse exploratoire des données (EDA) visant à évaluer
+  la qualité et le caractère discriminant des différentes bandes
+  spectrales/radar avant l'entraînement — reprend la description déjà
+  présente dans la version précédente de ce fichier de review, vérifiée et
+  détaillée ici après lecture complète du notebook (31 cellules).
+  Structure :
+  1. Échantillonnage stratifié (jusqu'à 500 patchs/classe via
+     `sklearn.utils.resample`) sur le training set pour limiter le coût de
+     calcul de l'EDA.
+  2. Étude de variance intra/inter-classe par bande (ratio de Fisher =
+     variance inter-classes / variance intra-classe moyenne) pour
+     Sentinel-2 (10 bandes) puis Sentinel-1 (8 bandes) — conclusion notée
+     dans le notebook : les bandes Sentinel-2 sont globalement équivalentes
+     en pouvoir discriminant univarié (l'information spatiale
+     prime probablement) ; côté Sentinel-1, seules les bandes 5 et 6 sont
+     nettement plus discriminantes (mais bruitées), Sentinel-1 seul jugé
+     insuffisant pour la tâche.
+  3. Violin plots + boxplots superposés par bande et par classe LCZ
+     (`plot_violin_par_bande`), avec le ratio de Fisher affiché en titre.
+  4. Étude de la répartition des classes LCZ entre train/val/test
+     (`get_lcz_distribution_fast`, lecture rapide des labels seuls sans
+     charger les images) — dont une question ouverte laissée en cellule
+     markdown sur l'opportunité de retirer la classe E (Bare rock/paved,
+     très minoritaire).
+  5. Étude de la répartition géographique (par continent) de chaque split
+     train/val/test, et re-déclinaison de la distribution LCZ par continent
+     pour chacun des 3 splits (boucles sur les dictionnaires
+     `*_CONTINENT_TO_H5`, alimentés par les fichiers produits par
+     segmentation_set.py).
+  Dépendances : h5py, numpy, scikit-learn (`resample`), matplotlib.
+  Étude complémentaire mentionnée dans la review précédente (variance
+  inter/intra pour orienter le choix de bande / modèle plus simple) menée
+  à son terme méthodologiquement mais jugée non concluante par l'auteur.
+
+------------------------------------------------------------------------
+4. cromacode/ — scripts SLURM (cluster Jean Zay, GPU V100)
+------------------------------------------------------------------------
+
+cromacode/train_croma_v100.slurm
+  Rôle : lance `script_finetuning.py` en DDP multi-GPU (2 tâches/nœud, 1
+  GPU chacune, mapping RANK/LOCAL_RANK/WORLD_SIZE depuis
+  SLURM_PROCID/LOCALID/NTASKS) sur la QoS courte `qos_gpu-dev` (max 2h,
+  ici `--time=01:30:00` car un epoch dure ~40 min) — pensé pour du
+  développement/debug rapide avec cycles de préemption fréquents.
+  Mécanisme de reprise : `--signal=SIGTERM@240` envoie SIGTERM 240s avant
+  le kill directement au step `srun` ; le wrapper bash capture ce signal
+  via un `trap` explicite et le relaie au process Python (lancé en tâche de
+  fond + `wait`, nécessaire pour que le `trap` puisse s'exécuter pendant
+  l'attente) pour laisser au script Python le temps de checkpointer
+  proprement. En sortie de `srun`, le code de sortie est inspecté à la
+  main : `99` (convention interne signalant une préemption propre côté
+  Python, cf. finetuning.py/script_finetuning.py) déclenche un
+  `scontrol requeue` explicite plutôt que de compter uniquement sur
+  `--requeue`. `--resume` étant actif par défaut côté `script_finetuning.py`,
+  chaque reprise repart automatiquement de `$CKPT_DIR/last.pt`.
+  Dépendances internes : cromacode/script_finetuning.py.
+
+cromacode/train_croma_v100_20h.slurm
+  Rôle : variante longue durée du script précédent — même appel à
+  `script_finetuning.py` en DDP 2 GPU, mais sur la QoS `qos_gpu-t3` (max
+  20h, `--time=20:00:00`), pour un entraînement complet en une seule
+  soumission plutôt qu'une succession de runs courts.
+  Différences vs. train_croma_v100.slurm : `--signal=B:SIGTERM@240` (le
+  `B:` route le signal vers le script batch lui-même, pas vers le step
+  `srun`) combiné à `--requeue` suffit ici à laisser Slurm gérer la
+  préemption/reprise nativement, donc pas de wrapper bash avec `trap`/
+  tâche de fond ni de vérification manuelle du code de sortie 99 — le
+  script est en `set -euo pipefail` strict (contre `set -uo pipefail` sans
+  `-e` pour l'autre variante, qui a besoin de laisser `srun` échouer sans
+  arrêter le script afin de lire `$EXIT_CODE` ensuite).
+  Dépendances internes : cromacode/script_finetuning.py.
+
+cromacode/data_viz/geotiff_to_gep_rgb.py
+  Rôle : convertit les GeoTIFF scientifiques produits par
+  `create_gpkg_kml.py::write_geotiff_for_example` (10 bandes Sentinel-2,
+  `float32`, réflectance brute non bornée 0-255) en copies 8-bit RGB
+  "prêtes à afficher" — seul format que Google Earth Pro sait rendre
+  correctement (contrairement à QGIS, GEP ne gère pas les rasters
+  scientifiques multi-bandes/haute profondeur, d'où le problème de
+  visualisation initial). Le géoréférencement (CRS + transform affine) est
+  une métadonnée GDAL indépendante du type de pixel : la copie garde le
+  même `crs`/`transform` que l'original, donc s'ouvre exactement à la même
+  position dans GEP.
+  Parcourt `figures/exemples/etape_*_*/*.tif` et écrit chaque copie dans
+  `figures/exemples/GEP/etape_{k}_{continent}/<même nom de fichier>`
+  (structure miroir, jamais reparcourue par le scan puisque "GEP" ne
+  matche pas le motif "etape_*_*").
+  Responsabilités : `stretch_to_uint8` — étirement de contraste par
+  percentiles (défaut 2-98, `--low-pct`/`--high-pct`), pas un min-max naïf
+  (qui serait écrasé par un pixel aberrant type nuage/reflet) ; renvoie du
+  gris moyen (128) plutôt que de diviser par zéro si une bande est
+  quasi-constante ; `convert_one` — lit les 3 premières bandes (déjà en
+  ordre R,G,B grâce à `band_order` dans `write_geotiff_for_example`, pas
+  besoin de les réordonner ici), écrit une GeoTIFF 3 bandes `uint8`
+  (`photometric="RGB"`) avec le `profile` rasterio de la source, juste
+  `count`/`dtype`/`compress` mis à jour. Supporte `--dry-run`, même
+  convention que les autres scripts utilitaires du projet
+  (`rename_etapes.py`, `delete_resume_csv.py`).
+  Dépendances : rasterio, numpy. Aucun import interne.

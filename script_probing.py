@@ -13,26 +13,32 @@ from typing import Optional
 
 
 from probes import CROMALinearProbe, CROMAMLProbe
+from cache_to_disk import build_cache_path
+from utils.naming_utils import num_classes_for, build_probe_checkpoint_name
 
 
-def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_resolution: int, modality: str):
+def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_resolution: int, modality: str, urban_only: bool):
     start_time = time.time()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     pretrained_path = "D:/CROMA_weights/CROMA_base.pt"
+    num_classes = num_classes_for(urban_only)
 
     if train:
-        # Charger les features déjà extraites
-        if interpolation_mtd is not None:
-            train_payload = torch.load(
-                f"cache/train_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location="cpu")
-            val_payload = torch.load(
-                f"cache/val_{modality}_{interpolation_mtd}_{image_resolution}.pt",   map_location="cpu")
-        else:
-            train_payload = torch.load(
-                f"cache/train_{modality}_{image_resolution}.pt", map_location="cpu")
-            val_payload = torch.load(
-                f"cache/val_{modality}_{image_resolution}.pt", map_location="cpu")
+        # Charger les features déjà extraites (mêmes chemins que ceux écrits
+        # par script_uno.py/cache_to_disk.py, urban_only inclus dans le nom).
+        train_cache_path = build_cache_path(
+            cache_dir="cache", cache_name="train", cache_metadata={},
+            method=interpolation_mtd, image_resolution=image_resolution,
+            modality=modality, urban_only=urban_only,
+        )
+        val_cache_path = build_cache_path(
+            cache_dir="cache", cache_name="val", cache_metadata={},
+            method=interpolation_mtd, image_resolution=image_resolution,
+            modality=modality, urban_only=urban_only,
+        )
+        train_payload = torch.load(train_cache_path, map_location="cpu")
+        val_payload = torch.load(val_cache_path, map_location="cpu")
 
         train_features = train_payload["features"]  # (N, 768)
         train_labels = train_payload["labels"]    # (N,)
@@ -59,11 +65,12 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
                 pretrained_path=pretrained_path,
                 modality=modality,
                 joint=True,
-                num_classes=10,
+                num_classes=num_classes,
             ).to(device)
         else:
             probe = CROMAMLProbe(
-                pretrained_path=pretrained_path, joint=True).to(device)
+                pretrained_path=pretrained_path, joint=True,
+                num_classes=num_classes).to(device)
 
         optimizer = torch.optim.Adam(probe.classifier.parameters(), lr=1e-3)
         criterion = nn.CrossEntropyLoss()
@@ -152,20 +159,10 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
                 best_val_aa = val_aa
                 epochs_without_improvement = 0
                 print("Meilleur modèle sauvegardé !")
-                if linear:
-                    if interpolation_mtd is not None:
-                        torch.save(probe.classifier.state_dict(),
-                                   f"best_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt")
-                    else:
-                        torch.save(probe.classifier.state_dict(),
-                                   f"best_linear_probe_{modality}_{image_resolution}.pt")
-                else:
-                    if interpolation_mtd is not None:
-                        torch.save(probe.classifier.state_dict(),
-                                   f"best_non_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt")
-                    else:
-                        torch.save(probe.classifier.state_dict(),
-                                   f"best_non_linear_probe_{modality}_{image_resolution}.pt")
+                probe_kind = "best_linear_probe" if linear else "best_non_linear_probe"
+                probe_ckpt_name = build_probe_checkpoint_name(
+                    probe_kind, modality, interpolation_mtd, image_resolution, urban_only)
+                torch.save(probe.classifier.state_dict(), probe_ckpt_name)
             else:
                 epochs_without_improvement += 1
 
@@ -175,12 +172,12 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
             f"\nEntraînement terminé — {epoch} epochs | meilleure val loss: {best_val_aa:.4f}")
 
     else:
-        if interpolation_mtd is not None:
-            test_payload = torch.load(
-                f"cache/test_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location="cpu")
-        else:
-            test_payload = torch.load(
-                f"cache/test_{modality}_{image_resolution}.pt", map_location="cpu")
+        test_cache_path = build_cache_path(
+            cache_dir="cache", cache_name="test", cache_metadata={},
+            method=interpolation_mtd, image_resolution=image_resolution,
+            modality=modality, urban_only=urban_only,
+        )
+        test_payload = torch.load(test_cache_path, map_location="cpu")
         test_features = test_payload["features"]  # (N, 768)
         test_labels = test_payload["labels"]    # (N,)
         # DataLoaders légers, num_workers=0, tout en RAM
@@ -191,26 +188,20 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
             num_workers=0,
         )
         # ── Chargement du meilleur modèle ────────────────────────────────────
+        probe_kind = "best_linear_probe" if linear else "best_non_linear_probe"
+        probe_ckpt_name = build_probe_checkpoint_name(
+            probe_kind, modality, interpolation_mtd, image_resolution, urban_only)
         if linear:
             probe = CROMALinearProbe(pretrained_path=pretrained_path,
                                      modality=modality,
                                      joint=True,
-                                     num_classes=10,).to(device)
-            if interpolation_mtd is not None:
-                probe.classifier.load_state_dict(torch.load(
-                    f"best_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location=device))
-            else:
-                probe.classifier.load_state_dict(torch.load(
-                    f"best_linear_probe_{modality}_{image_resolution}.pt", map_location=device))
+                                     num_classes=num_classes).to(device)
         else:
             probe = CROMAMLProbe(
-                pretrained_path=pretrained_path, joint=True).to(device)
-            if interpolation_mtd is not None:
-                probe.classifier.load_state_dict(torch.load(
-                    f"best_non_linear_probe_{modality}_{interpolation_mtd}_{image_resolution}.pt", map_location=device))
-            else:
-                probe.classifier.load_state_dict(torch.load(
-                    f"best_non_linear_probe_{modality}_{image_resolution}.pt", map_location=device))
+                pretrained_path=pretrained_path, joint=True,
+                num_classes=num_classes).to(device)
+        probe.classifier.load_state_dict(torch.load(
+            probe_ckpt_name, map_location=device))
         probe.eval()
 
         # ── Inférence ────────────────────────────────────────────────────────
@@ -271,7 +262,8 @@ def probing(train: bool, linear: bool, interpolation_mtd: Optional[str], image_r
 if __name__ == "__main__":
     print("On commence par le train : \n")
     probing(train=True, linear=True, interpolation_mtd="nearest",
-            image_resolution=120, modality="both")
+            image_resolution=120, modality="both", urban_only=True)
     print("Passage au test :\n")
     probing(train=False, linear=True,
-            interpolation_mtd="nearest", image_resolution=120, modality="both")
+            interpolation_mtd="nearest", image_resolution=120, modality="both",
+            urban_only=True)

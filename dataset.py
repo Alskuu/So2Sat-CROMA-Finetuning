@@ -25,7 +25,6 @@ class So2SatDataset(Dataset):
         self._h5_file = self._sen1 = self._sen2 = self._labels = None
         self.method = interpolation_mtd
 
-        self.selected_classes = None
         self.label_mapping = None
 
         with h5py.File(self.h5_path, "r") as f:
