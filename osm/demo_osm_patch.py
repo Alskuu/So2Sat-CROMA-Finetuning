@@ -1,5 +1,5 @@
 """
-  1. emprise()     : d'un point central à un carré de 320 m (la taille d'un patch So2Sat)
+  1. emprise()     : d'un point central à un carré de 320 m (patch So2Sat)
   2. objets_osm()  : tous les objets OpenStreetMap présents dans ce carré (API principale d'OSM)
   3. trier()       : on ne garde que les tags utiles pour les LCZ
   +  resumer()     : un aperçu de ce qu'on obtient
@@ -21,7 +21,7 @@ EXEMPLES = [
 
 COTE_M = 320  # 32 pixels x 10 m
 
-# Serveurs Overpass publics, utilisés seulement en secours
+# Serveurs Overpass publics
 SERVEURS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
