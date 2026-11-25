@@ -7,3 +7,5 @@ checkpoints/best_backbone.pt
 checkpoints/config_lrs_23_07/
 figures/
 visu_erreurs.qgz
+osm/CLAUDE.md
+osm/cache/

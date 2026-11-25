@@ -1,0 +1,21 @@
+lieu,source,annee_so2sat,annee_source,ecart_bati_pts,devenus_batis_pct,plus_batis_pct,pixels_changes_pct,verdict
+Paris - Quartier latin,OSM,2017,2025,1.1,1.1,0.0,1.1,cohérent
+Paris - Quartier latin,EUBUCCO,2017,2025,1.1,1.1,0.0,1.1,cohérent
+Paris - Quartier latin,Microsoft,2017,2020,1.1,1.1,0.0,1.1,cohérent
+Paris - Quartier latin,GBA,2017,2019,0.5,0.8,0.3,1.1,cohérent
+Paris - Quartier latin,Open Buildings 2.5D,2017,2023,1.1,1.1,0.0,1.1,cohérent
+Nairobi - centre,OSM,2017,2025,0.0,0.0,0.0,0.0,cohérent
+Nairobi - centre,EUBUCCO,2017,2025,0.0,0.0,0.0,0.0,cohérent
+Nairobi - centre,Microsoft,2017,2020,0.0,0.0,0.0,0.0,cohérent
+Nairobi - centre,GBA,2017,2019,0.0,0.0,0.0,0.0,cohérent
+Nairobi - centre,Open Buildings 2.5D,2017,2023,0.0,0.0,0.0,0.0,cohérent
+Nairobi - Kibera,OSM,2017,2025,0.0,0.0,0.0,0.0,cohérent
+Nairobi - Kibera,EUBUCCO,2017,2025,0.0,0.0,0.0,0.0,cohérent
+Nairobi - Kibera,Microsoft,2017,2020,0.0,0.0,0.0,0.0,cohérent
+Nairobi - Kibera,GBA,2017,2019,0.0,0.0,0.0,0.0,cohérent
+Nairobi - Kibera,Open Buildings 2.5D,2017,2023,0.0,0.0,0.0,0.0,cohérent
+Ruaka nord (témoin),OSM,2017,2025,5.2,6.2,1.1,28.1,à vérifier
+Ruaka nord (témoin),EUBUCCO,2017,2025,5.2,6.2,1.1,28.1,à vérifier
+Ruaka nord (témoin),Microsoft,2017,2020,-1.4,1.3,2.6,8.3,cohérent
+Ruaka nord (témoin),GBA,2017,2019,-4.6,0.0,4.6,5.9,cohérent
+Ruaka nord (témoin),Open Buildings 2.5D,2017,2023,12.2,12.3,0.1,14.2,à vérifier

@@ -1,0 +1,16 @@
+lieu,source,nb_batiments,surface_batie_pct,surface_moyenne_m2,hauteur_connue_pct_surface,hauteur_mediane_m,bas_pct,moyen_pct,haut_pct
+Paris - Quartier latin,OSM,161.0,34.7,221.0,89.5,15.0,6.3,93.7,0.0
+Paris - Quartier latin,EUBUCCO,198.0,35.0,181.0,100.0,16.8,8.2,91.8,0.0
+Paris - Quartier latin,Microsoft,21.0,38.5,1877.0,99.6,14.0,0.6,99.4,0.0
+Paris - Quartier latin,GBA,166.0,35.0,216.0,100.0,13.5,2.4,97.6,0.0
+Paris - Quartier latin,Open Buildings 2.5D,,,,,,,,
+Nairobi - centre,OSM,61.0,37.6,632.0,41.0,24.0,11.3,44.8,43.9
+Nairobi - centre,EUBUCCO,,,,,,,,
+Nairobi - centre,Microsoft,34.0,42.8,1289.0,0.0,,,,
+Nairobi - centre,GBA,92.0,34.4,384.0,100.0,8.4,46.5,48.4,5.1
+Nairobi - centre,Open Buildings 2.5D,180.0,34.3,195.0,100.0,21.7,13.7,40.8,45.5
+Nairobi - Kibera,OSM,583.0,48.0,84.0,4.2,3.0,100.0,0.0,0.0
+Nairobi - Kibera,EUBUCCO,,,,,,,,
+Nairobi - Kibera,Microsoft,394.0,45.7,119.0,0.0,,,,
+Nairobi - Kibera,GBA,713.0,58.6,85.0,100.0,3.5,100.0,0.0,0.0
+Nairobi - Kibera,Open Buildings 2.5D,880.0,37.0,43.0,100.0,5.5,99.9,0.1,0.0
